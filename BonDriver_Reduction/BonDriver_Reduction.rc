@@ -1,0 +1,37 @@
+//Microsoft Developer Studio generated resource script.
+//
+#include <windows.h>
+
+LANGUAGE LANG_JAPANESE, SUBLANG_DEFAULT
+1 VERSIONINFO
+ FILEVERSION 1,5,1,20
+ PRODUCTVERSION 1,5,1,20
+ FILEFLAGSMASK 0x17L
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS VOS_NT
+ FILETYPE VFT_DLL
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "041104b0"
+        BEGIN
+            VALUE "CompanyName", "PRY8EAlByw"
+            VALUE "FileDescription", "BonDriver Reduction Wrapper DLL"
+            VALUE "FileVersion", "1,5,1,20"
+            VALUE "InternalName", "BonReduction"
+            VALUE "LegalCopyright", "PRY8EAlByw 2012-2020"
+            VALUE "OriginalFilename", "BonDriver_RDCT.dll"
+            VALUE "ProductName", "BonDriver RDCT DLL"
+            VALUE "ProductVersion", "1,5,1,20"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x411, 1200
+    END
+END
