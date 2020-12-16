@@ -1057,6 +1057,7 @@ BOOL CBonTuner::SetVirtualChannel(const DWORD dwSpace, const DWORD dwChannel)
     if(CurRTuner!=old_tuner)
       Tuners[CurRTuner].Tuner->PurgeTsStream();
     if(AsyncTSEnabled) {
+      exclusive_lock alock(&AsyncTSExclusive) ;
       if(AsyncTSFifo)
         AsyncTSFifo->Purge() ;
     }
