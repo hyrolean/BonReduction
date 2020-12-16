@@ -1183,7 +1183,8 @@ void CBonTuner::DoChannelKeeping()
           DWORD tuner = CurRTuner ;
           if(TunerPaths[CurRTuner].size()>=2) {
             AsyncTSSuspend_() ;
-            Tuners[CurRTuner].Free(!FullLoad) ;
+            if(FullLoad) Tuners[CurRTuner].Module = NULL ;
+            Tuners[CurRTuner].Free() ;
             RotateTunerCandidates(tuner) ;
             AsyncTSResume_() ;
           }
