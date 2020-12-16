@@ -263,7 +263,6 @@ CBonTuner::CBonTuner()
   CurRSpace=0 ;
   CurHasSignal=0 ;
   CurHasStream=0 ;
-  CurTuning=0 ;
   TunerRetryDuration=1000 ;
   ReloadOnTunerRetry=1 ;
   FullLoad=0 ;
@@ -479,7 +478,7 @@ void CBonTuner::LoadIni()
         string SpaceName = reader.ReadString(tuner_space_key) ;
         int MaxChannel = reader.ReadInteger(tuner_space_key + ".MaxChannel",-1) ;
         BOOL Visible = reader.ReadInteger(tuner_space_key + ".Visible",TRUE) ;
-        VSPACE Space(mbcs2wcs(SpaceName),j) ;
+        VSPACE Space(mbcs2wcs(SpaceName)) ;
         for(int k=0;k<MaxChannel;k++) {
           std::string chName = tuner_space_key + ".Channel" + itos(k) ;
           Space.Channels.push_back( VCHANNEL(
@@ -833,7 +832,7 @@ BOOL CBonTuner::VirtualToRealSpace(const DWORD dwSpace,DWORD &tuner,DWORD &spc)
               SaveIni() ; // 2012/11/21(Wed) 追加
               break ;
             }
-            Tuners[tuner].Spaces.push_back(VSPACE(name,n)) ;
+            Tuners[tuner].Spaces.push_back(VSPACE(name)) ;
             if(spc+n==dwSpace+skipSpc) {
               spc = static_cast<DWORD>(Tuners[tuner].Spaces.size()-1) ;
               return TRUE ;
@@ -1014,7 +1013,6 @@ BOOL CBonTuner::SetVirtualChannel(const DWORD dwSpace, const DWORD dwChannel)
   DWORD old_tuner=CurRTuner,old_spc=CurRSpace ;
   if(FullOpen) VirtualToRealSpace(CurSpace,old_tuner,old_spc) ;
   DWORD tuner,spc ;
-  CurTuning = TRUE ;
   if(VirtualToRealSpace(dwSpace,tuner,spc)) {
     size_t rotation_counter = TunerPaths[tuner].size() ;
     while(rotation_counter--) {
@@ -1024,19 +1022,6 @@ BOOL CBonTuner::SetVirtualChannel(const DWORD dwSpace, const DWORD dwChannel)
           CurRTuner = tuner ; CurRSpace = spc ;
           CurHasSignal = Tuners[CurRTuner].Spaces[CurRSpace].Channels[CurChannel].HasSignal ;
           CurHasStream = Tuners[CurRTuner].Spaces[CurRSpace].Channels[CurChannel].HasStream ;
-          if(FullOpen) {
-            if(old_tuner!=tuner)
-              Tuners[tuner].Tuner->PurgeTsStream() ;
-          }
-          //チャンネルをフルスキャンする
-          #if 0
-          if(FullScan) {
-            if(Tuners[tuner].Spaces[spc].MaxChannel==-1) {
-              DWORD ch=dwChannel;
-              while(EnumVirtualChannelName(dwSpace,ch++));
-            }
-          }
-          #endif
           Result = TRUE ;
           break ;
         }
@@ -1068,8 +1053,10 @@ BOOL CBonTuner::SetVirtualChannel(const DWORD dwSpace, const DWORD dwChannel)
     }
   }
   if(Result) {
+    // 予めパージを済ませておく
+    if(CurRTuner!=old_tuner)
+      Tuners[CurRTuner].Tuner->PurgeTsStream();
     if(AsyncTSEnabled) {
-      exclusive_lock alock(&AsyncTSExclusive) ;
       if(AsyncTSFifo)
         AsyncTSFifo->Purge() ;
     }
@@ -1082,7 +1069,6 @@ BOOL CBonTuner::SetVirtualChannel(const DWORD dwSpace, const DWORD dwChannel)
   if(Result) DBGOUT("succeeded");
   else DBGOUT("failed");
   DBGOUT(".\r\n");
-  CurTuning = FALSE ;
   return Result ;
 }
 //-----
@@ -1245,9 +1231,7 @@ const DWORD CBonTuner::WaitTsStream(const DWORD dwTimeOut)
     return WAIT_FAILED ;
   /*else if(!CurHasStream)
     DoDropStream();
-  */else if(CurTuning) {
-    return WAIT_TIMEOUT ;
-  }else{
+  */else{
     DoChannelKeeping() ;
     if(AsyncTSEnabled) {
       {
@@ -1271,7 +1255,7 @@ const DWORD CBonTuner::WaitTsStream(const DWORD dwTimeOut)
 //-----
 const DWORD CBonTuner::GetReadyCount(void)
 {
-  if(!OpenTunerOrdered||CurTuning)
+  if(!OpenTunerOrdered)
     return 0 ;
   /*else if(!CurHasStream)
     DoDropStream();
@@ -1298,7 +1282,7 @@ const BOOL CBonTuner::GetTsStream(BYTE *pDst, DWORD *pdwSize, DWORD *pdwRemain)
     return FALSE ;
   else if(!CurHasStream)
     DoDropStream();
-  else if(!CurTuning) {
+  else {
     DoChannelKeeping() ;
     if(AsyncTSEnabled) {
       exclusive_lock alock(&AsyncTSExclusive) ;
@@ -1333,7 +1317,7 @@ const BOOL CBonTuner::GetTsStream(BYTE **ppDst, DWORD *pdwSize, DWORD *pdwRemain
     return FALSE ;
   else if(!CurHasStream)
     DoDropStream();
-  else if(!CurTuning) {
+  else {
     DoChannelKeeping() ;
     if(AsyncTSEnabled) {
       exclusive_lock alock(&AsyncTSExclusive) ;

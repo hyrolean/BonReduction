@@ -31,13 +31,11 @@ struct VSPACE {
   int MaxChannel ;
   BOOL Profiled ;
   BOOL Visible ;
-  int Index;
-  explicit VSPACE(std::wstring name, int index) {
+  explicit VSPACE(std::wstring name) {
     Name = name ;
     MaxChannel = -1 ;
     Profiled = FALSE ;
     Visible = TRUE ;
-    Index = index ;
   }
 };
 
@@ -98,7 +96,7 @@ protected:
   int RefCount ;
   DWORD CurSpace, CurChannel ;
   DWORD CurRTuner, CurRSpace ;
-  BOOL CurHasSignal, CurHasStream, CurTuning ;
+  BOOL CurHasSignal, CurHasStream ;
   std::wstring TunerName ;
   std::vector< std::deque<std::string> > TunerPaths ;
   std::vector< std::deque<HINSTANCE> > TunerModules ;
