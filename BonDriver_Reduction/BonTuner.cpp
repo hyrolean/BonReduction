@@ -1057,7 +1057,8 @@ BOOL CBonTuner::SetVirtualChannel(const DWORD dwSpace, const DWORD dwChannel)
       AsyncTSSuspend_() ;
       for(size_t i=0;i<Tuners.size();i++) {
         if(i!=CurRTuner) {
-          Tuners[i].Free(!FullLoad) ;
+          if(FullLoad) Tuners[i].Module = NULL ;
+          Tuners[i].Free() ;
         }
       }
       AsyncTSResume_() ;

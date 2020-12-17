@@ -57,22 +57,18 @@ struct VTUNER {
     Profiled = FALSE ;
     LastRotateFailed = FALSE ;
   }
-  void Free(bool Destroy=true) {
+  void Free() {
     if(Tuner) {
       if(Opening) {
         Tuner->CloseTuner() ;
         Opening = FALSE ;
       }
-      if(Destroy) {
-        Tuner->Release() ;
-        Tuner=NULL ;
-      }
+      Tuner->Release() ;
+      Tuner=NULL ;
     }
-    if(Destroy) {
-      if(Module) {
-        FreeLibrary(Module) ;
-        Module=NULL ;
-      }
+    if(Module) {
+      FreeLibrary(Module) ;
+      Module=NULL ;
     }
     if(Mutex) {
       ReleaseMutex(Mutex) ;
