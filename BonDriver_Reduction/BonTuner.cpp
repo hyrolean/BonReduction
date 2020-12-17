@@ -761,8 +761,8 @@ BOOL CBonTuner::LoadTuner(size_t tuner,bool tuning,bool rotating)
               AsyncTSSuspend_() ;
               TunerClosed=true ;
             }
-            Tuners[tuner].Free(!FullLoad) ;
-            RotateTunerCandidates(tuner) ;
+            if(FullLoad) Tuners[tuner].Module=NULL ;
+            Tuners[tuner].Free() ;
             continue ;
           }
           MagicSent=FALSE ;
@@ -776,7 +776,16 @@ BOOL CBonTuner::LoadTuner(size_t tuner,bool tuning,bool rotating)
                 channel_tuned
                  = Tuners[tuner].Tuner->SetChannel(CurRSpace,CurChannel) ;
               if(!channel_tuned) {
-                ResetChannel() ;
+                if(n&&rotating) {
+                  if(!TunerClosed) {
+                    AsyncTSSuspend_() ;
+                    TunerClosed=true ;
+                  }
+                  if(FullLoad) Tuners[tuner].Module=NULL ;
+                  Tuners[tuner].Free() ;
+                  continue ;
+                }else
+                  ResetChannel() ;
               }
             }
           }
@@ -1016,7 +1025,10 @@ BOOL CBonTuner::SetVirtualChannel(const DWORD dwSpace, const DWORD dwChannel)
   if(VirtualToRealSpace(dwSpace,tuner,spc)) {
     size_t rotation_counter = TunerPaths[tuner].size() ;
     while(rotation_counter--) {
-      if(LoadTuner(tuner,false,false)) {
+      BOOL loaded = LoadTuner(tuner,false,false) ;
+      if(TunerPaths[tuner].size()>=2)
+        RotateTunerCandidates(tuner) ;
+      if(loaded) {
         if(Tuners[tuner].Tuner->SetChannel(spc,dwChannel)) {
           CurSpace = dwSpace ; CurChannel = dwChannel ;
           CurRTuner = tuner ; CurRSpace = spc ;
@@ -1028,9 +1040,8 @@ BOOL CBonTuner::SetVirtualChannel(const DWORD dwSpace, const DWORD dwChannel)
       }
       if(rotation_counter) {
         AsyncTSSuspend_() ;
-        Tuners[tuner].Free(!FullLoad) ;
-        if(TunerPaths[tuner].size()>=2)
-          RotateTunerCandidates(tuner) ;
+        if(FullLoad) Tuners[tuner].Module = NULL ;
+        Tuners[tuner].Free() ;
         AsyncTSResume_() ;
       }
     }
@@ -1185,7 +1196,6 @@ void CBonTuner::DoChannelKeeping()
             AsyncTSSuspend_() ;
             if(FullLoad) Tuners[CurRTuner].Module = NULL ;
             Tuners[CurRTuner].Free() ;
-            RotateTunerCandidates(tuner) ;
             AsyncTSResume_() ;
           }
           if(!SetVirtualChannel(CurSpace,CurChannel)) {
