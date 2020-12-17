@@ -283,7 +283,7 @@ void CMainDaemon::LoadIni()
       if(FileMask!="") {
         BOOL Enabled=TRUE ;
         int MaxFiles=INT_MAX, MaxDays=INT_MAX ;
-        __int64 MaxBytes=0 ;
+        __int64 MaxBytes=INT64_MAX ;
         BOOL SubDirectories=0 ;
         string FellowSuffix="^";
         LOADINT(Enabled);
