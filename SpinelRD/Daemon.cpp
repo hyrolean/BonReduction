@@ -99,6 +99,7 @@ void CDaemonTimer::Update()
 CMainDaemon MainDaemon;
 
 #define THREAD_TERMINATE_LIMIT    30000
+#define DEFMAXBYTES               9223372036854775807
 
 #define DEFDAEMONSHOWTASKICON     0
 #define DEFDAEMONJOBPAUSE         0
@@ -283,7 +284,7 @@ void CMainDaemon::LoadIni()
       if(FileMask!="") {
         BOOL Enabled=TRUE ;
         int MaxFiles=INT_MAX, MaxDays=INT_MAX ;
-        __int64 MaxBytes=INT64_MAX ;
+        __int64 MaxBytes=DEFMAXBYTES ;
         BOOL SubDirectories=0 ;
         string FellowSuffix="^";
         LOADINT(Enabled);
