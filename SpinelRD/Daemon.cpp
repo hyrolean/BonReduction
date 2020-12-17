@@ -284,7 +284,7 @@ void CMainDaemon::LoadIni()
         BOOL Enabled=TRUE ;
         int MaxFiles=INT_MAX, MaxDays=INT_MAX ;
         __int64 MaxBytes=0 ;
-        BOOL SubDirectories ;
+        BOOL SubDirectories=0 ;
         string FellowSuffix="^";
         LOADINT(Enabled);
         if(!Enabled) continue ;
