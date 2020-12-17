@@ -16,6 +16,8 @@
 using namespace std;
 
 //===========================================================================
+// Functions
+//---------------------------------------------------------------------------
 static __int64 GetDiskFreeSpaceFromFileName(string FileName)
 {
   string Drive = file_drive_of(FileName);
@@ -39,6 +41,23 @@ static __int64 GetDiskFreeSpaceFromFileName(string FileName)
            __int64(BytesPerSector)       ;
 
   return -1;
+}
+//---------------------------------------------------------------------------
+__int64 GetFileSize(string FileName)
+{
+  HANDLE hFile = CreateFileA(
+            FileName.c_str(),0,
+            FILE_SHARE_READ|FILE_SHARE_WRITE,0,
+            OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,0 );
+
+  if (hFile == INVALID_HANDLE_VALUE)
+    return -1 ;
+
+  DWORD SizeLow = 0, SizeHigh = 0;
+  SizeLow = GetFileSize(hFile, &SizeHigh);
+  CloseHandle(hFile) ;
+
+  return (__int64(SizeHigh) << 32) | __int64(SizeLow);
 }
 //===========================================================================
 // 監視タイマークラス CDaemonTimer
@@ -265,18 +284,21 @@ void CMainDaemon::LoadIni()
         BOOL Enabled=TRUE ;
         int MaxFiles=INT_MAX, MaxDays=INT_MAX ;
         __int64 MaxBytes=0 ;
+        BOOL SubDirectories ;
         string FellowSuffix="^";
         LOADINT(Enabled);
         if(!Enabled) continue ;
         LOADINT(MaxFiles);
         LOADINT(MaxDays);
         LOADINT64(MaxBytes);
+        LOADINT(SubDirectories);
         LOADSTR(FellowSuffix) ;
         vector<string> FellowSuffixList ;
         if(FellowSuffix!="^") {
           split(FellowSuffixList,FellowSuffix,',');
         }
-        rotations.push_back(TRotationItem(FileMask,MaxFiles,MaxDays,MaxBytes,FellowSuffixList));
+        rotations.push_back(
+          TRotationItem(FileMask,MaxFiles,MaxDays,MaxBytes,!!SubDirectories,FellowSuffixList));
       }
     }
 
@@ -441,10 +463,10 @@ bool CMainDaemon::LaunchSpinel()
     DWORD ftime ;
     __int64 fsize ;
     int tag ;
-    logdata(const WIN32_FIND_DATAA &find_data, int tag_=-1) : tag(tag_) {
+    logdata(const WIN32_FIND_DATAA &find_data, int tag_=-1, string relPath="") : tag(tag_) {
       FILETIME local ;
       WORD d=0, t=0 ;
-      fname = find_data.cFileName ;
+      fname = relPath + string(find_data.cFileName) ;
       FileTimeToLocalFileTime(&find_data.ftLastWriteTime, &local);
       FileTimeToDosDateTime(&local, &d, &t);
       ftime = DWORD(d)<<16|DWORD(t) ;
@@ -458,10 +480,30 @@ bool CMainDaemon::LaunchSpinel()
     }
   };
 
+  typedef vector<string> dirs_t ;
+
+  static int enum_dirs(dirs_t &dirs, string Path,bool *pAborted=NULL) {
+    int n = 0 ;
+    WIN32_FIND_DATAA Data ;
+    HANDLE HFind = FindFirstFileA((Path+"*.*").c_str(),&Data) ;
+    if(HFind!=INVALID_HANDLE_VALUE) {
+        do {
+            if(pAborted&&*pAborted) break ;
+            if(!(Data.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)) continue ;
+            if(Data.cFileName&&Data.cFileName[0]!='.') {
+                dirs.push_back(Data.cFileName) ;
+                n++;
+            }
+        }while(FindNextFileA(HFind,&Data)) ;
+        FindClose(HFind) ;
+    }
+    return n ;
+  }
+
   typedef multiset<logdata,logcomp> logset ;
 
-  static __int64 make_logset(logset &LogSet,string FileMask,
-      DWORD *pMaxTime=NULL,bool *pAborted=NULL, int tag=-1) {
+  static __int64 make_logset(logset &LogSet,string FileMask,bool SubDirec=false,
+      DWORD *pMaxTime=NULL,bool *pAborted=NULL, int tag=-1,string relPath="") {
 
     string LogPath = file_path_of(FileMask) ;
 
@@ -477,17 +519,31 @@ bool CMainDaemon::LaunchSpinel()
     }
 
     for(size_t i=0;i<Masks.size();i++) {
-      string LogPathMask = LogPath+Masks[i] ;
+      string LogPathMask = LogPath+relPath+Masks[i] ;
       HANDLE HFind = FindFirstFileA(LogPathMask.c_str(),&Data) ;
       if(HFind!=INVALID_HANDLE_VALUE) {
           do {
               if(pAborted&&*pAborted) break ;
-              logdata ldata(Data,tag) ;
+              if(Data.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY) continue ;
+              logdata ldata(Data,tag,relPath) ;
               LogSet.insert(ldata);
               LogBytes += ldata.fsize ;
               if( ldata.ftime > maxTime ) maxTime = ldata.ftime ;
           }while(FindNextFileA(HFind,&Data)) ;
           FindClose(HFind) ;
+      }
+    }
+
+    if(SubDirec) {
+      dirs_t dirs ;
+      if(enum_dirs(dirs,LogPath+relPath,pAborted)>0) {
+        for(size_t i=0;i<dirs.size();i++) {
+          if(pAborted&&*pAborted) break ;
+          DWORD subMaxTime=0;
+          LogBytes+=make_logset(
+            LogSet,FileMask,true,&subMaxTime,pAborted,tag,relPath+dirs[i]+"\\");
+          if(subMaxTime>maxTime) maxTime = subMaxTime ;
+        }
       }
     }
 
@@ -498,13 +554,13 @@ bool CMainDaemon::LaunchSpinel()
 
 static void LogRotateFiles(
     string FileMask,int MaxFiles,int MaxDays,__int64 MaxFileBytes,
-    const vector<string> &FellowExts, bool &Aborted )
+    bool SubDirectories,const vector<string> &FellowExts, bool &Aborted )
 {
   string LogPath = file_path_of(FileMask) ;
 
   logset LogSet ;
   DWORD maxTime = 0 ;
-  __int64 LogBytes= make_logset(LogSet,FileMask,&maxTime,&Aborted) ;
+  __int64 LogBytes= make_logset(LogSet,FileMask,SubDirectories,&maxTime,&Aborted) ;
 
   if(Aborted) return ;
 
@@ -533,9 +589,13 @@ static void LogRotateFiles(
     string FileName = LogPath + pos->fname ;
     if(!file_is_existed(FileName)||DeleteFileA(FileName.c_str())) {
       LogBytes -= pos->fsize ; LogFiles-- ;
+      string fpathprefix = file_path_of(FileName) + file_prefix_of(FileName) ;
       for(size_t i=0;i<FellowExts.size();i++) {
-        string fellow_filename = LogPath+file_prefix_of(FileName)+FellowExts[i] ;
-        DeleteFileA(fellow_filename.c_str());
+        string fellow_filename = fpathprefix+FellowExts[i] ;
+        __int64 fellow_sz = GetFileSize(fellow_filename) ;
+        if(DeleteFileA(fellow_filename.c_str())) {
+          if(fellow_sz>0) LogBytes -= fellow_sz ;
+        }
       }
     }
   }
@@ -553,7 +613,8 @@ void CMainDaemon::JobRotate()
       JobRotations[i].MaxFiles,
       JobRotations[i].MaxDays,
       JobRotations[i].MaxBytes,
-      JobRotations[i].FellowSuffix, JobAborted ) ;
+      JobRotations[i].SubDirectories,
+      JobRotations[i].FellowSuffix,JobAborted ) ;
     if(JobAborted) return ;
   }
 
@@ -585,6 +646,7 @@ void CMainDaemon::JobRotate()
             JobRotations[i].MaxFiles,
             JobRotations[i].MaxDays,
             JobRotations[i].MaxBytes,
+            JobRotations[i].SubDirectories,
             JobRotations[i].FellowSuffix, JobAborted) ;
           continue ;
         }
@@ -605,7 +667,9 @@ void CMainDaemon::JobRotate()
       size_t &LogFiles = Stats[i].LogFiles ;
       size_t sz = LogSet.size() ;
       LogPath = file_path_of(JobRotations[ji].FileMask);
-      make_logset(LogSet,JobRotations[ji].FileMask,&maxTime,&JobAborted,i) ;
+      make_logset(LogSet,
+        JobRotations[ji].FileMask,
+        JobRotations[ji].SubDirectories,&maxTime,&JobAborted,i) ;
       LogFiles = LogSet.size() - sz ;
       DWORD maxDays = DWORD(JobRotations[ji].MaxDays)<<16 ;
       if(maxTime<maxDays) Stats[i].BorderTime=0 ;
@@ -633,9 +697,13 @@ void CMainDaemon::JobRotate()
         spaces[drv] += pos->fsize ;
         LogFiles-- ;
         const vector<string> &FellowExts= JobRotations[ji].FellowSuffix ;
+        string fpathprefix = file_path_of(FileName)+file_prefix_of(FileName) ;
         for(i=0;i<FellowExts.size();i++) {
-          string fellow_filename = LogPath+file_prefix_of(FileName)+FellowExts[i] ;
-          DeleteFileA(fellow_filename.c_str());
+          string fellow_filename = fpathprefix+FellowExts[i] ;
+          __int64 fellow_sz = GetFileSize(fellow_filename) ;
+          if(DeleteFileA(fellow_filename.c_str())) {
+            if(fellow_sz>0) spaces[drv] += fellow_sz ;
+          }
         }
       }
     }

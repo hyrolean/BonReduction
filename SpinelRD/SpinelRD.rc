@@ -77,7 +77,7 @@ CAPTION "バージョン情報 SpinelRD"
 FONT 9, "MS UI Gothic", 0, 0, 0x1
 BEGIN
     ICON            IDI_SPINELRD,IDC_STATIC,14,14,20,20
-    LTEXT           "Spinel Resume DAEMON, Version 1.1c",IDC_STATIC,42,14,114,8,SS_NOPREFIX
+    LTEXT           "Spinel Resume DAEMON, Version 1.1d",IDC_STATIC,42,14,114,8,SS_NOPREFIX
     LTEXT           "Copyright (C) 2020 PRY8EAlByw",IDC_STATIC,42,26,114,8
     DEFPUSHBUTTON   "OK",IDOK,114,48,50,14,WS_GROUP
     PUSHBUTTON      "SpinelRDを終了(&X)",IDABORT,43,48,64,14

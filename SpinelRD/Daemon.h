@@ -46,13 +46,17 @@ typedef std::map<int,CDaemonTimer*> MAP_DaemonTimer ;
     size_t MaxFiles;
     int MaxDays;
     __int64 MaxBytes;
+    bool SubDirectories;
     std::vector<std::string> FellowSuffix ;
     TRotationItem(std::string FileMask_,int MaxFiles_,int MaxDays_,
-      __int64 MaxBytes_,const std::vector<std::string> &FellowSuffix_=std::vector<std::string>())
-      : FileMask(FileMask_),MaxFiles(MaxFiles_),MaxDays(MaxDays_),MaxBytes(MaxBytes_),FellowSuffix(FellowSuffix_)
+      __int64 MaxBytes_,bool SubDirectories_=false,
+      const std::vector<std::string> &FellowSuffix_=std::vector<std::string>())
+      : FileMask(FileMask_),MaxFiles(MaxFiles_),MaxDays(MaxDays_),
+        MaxBytes(MaxBytes_),SubDirectories(SubDirectories_),FellowSuffix(FellowSuffix_)
     {}
     TRotationItem(const TRotationItem &src)
-      : FileMask(src.FileMask),MaxFiles(src.MaxFiles),MaxDays(src.MaxDays),MaxBytes(src.MaxBytes),FellowSuffix(src.FellowSuffix)
+      : FileMask(src.FileMask),MaxFiles(src.MaxFiles),MaxDays(src.MaxDays),
+        MaxBytes(src.MaxBytes),SubDirectories(src.SubDirectories),FellowSuffix(src.FellowSuffix)
     {}
   };
   typedef std::vector<TRotationItem> TRotations;
