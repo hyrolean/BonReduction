@@ -43,8 +43,9 @@ static __int64 GetDiskFreeSpaceFromFileName(string FileName)
   return -1;
 }
 //---------------------------------------------------------------------------
-__int64 GetFileSize(string FileName)
+static __int64 GetFileSize(string FileName)
 {
+#if 0
   HANDLE hFile = CreateFileA(
             FileName.c_str(),0,
             FILE_SHARE_READ|FILE_SHARE_WRITE,0,
@@ -58,6 +59,14 @@ __int64 GetFileSize(string FileName)
   CloseHandle(hFile) ;
 
   return (__int64(SizeHigh) << 32) | __int64(SizeLow);
+#else
+  WIN32_FIND_DATAA data ;
+  HANDLE h = FindFirstFileA(FileName.c_str(),&data);
+  if(h == INVALID_HANDLE_VALUE) return -1 ;
+  FindClose(h) ;
+  if(data.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY) return -1 ;
+  return __int64(data.nFileSizeHigh)<<32 | __int64(data.nFileSizeLow) ;
+#endif
 }
 //===========================================================================
 // 監視タイマークラス CDaemonTimer
@@ -448,12 +457,12 @@ bool CMainDaemon::LaunchSpinel()
           }
           if(SpinelDeathResume) {
             SpinelProcess = info.hProcess ;
-		  }else {
-			CloseHandle(info.hProcess) ;
-		  }
-		}
-		return true ;
-	  }
+          }else {
+            CloseHandle(info.hProcess) ;
+          }
+        }
+        return true ;
+      }
 
    return false ;
 }
@@ -562,6 +571,24 @@ static void LogRotateFiles(
   logset LogSet ;
   DWORD maxTime = 0 ;
   __int64 LogBytes= make_logset(LogSet,FileMask,SubDirectories,&maxTime,&Aborted) ;
+
+  if(!FellowExts.empty()) {
+    set<string> done ;
+    for(logset::iterator pos=LogSet.begin();pos!=LogSet.end();++pos) {
+      if(Aborted) break ;
+      string FileName = LogPath + pos->fname ;
+      string fpathprefix =
+        lower_case( file_path_of(FileName) + file_prefix_of(FileName) ) ;
+      for(size_t i=0;i<FellowExts.size();i++) {
+        string fellow_filename = fpathprefix + lower_case(FellowExts[i]) ;
+        if(!done.count(fellow_filename)) {
+          __int64 fellow_sz = GetFileSize(fellow_filename) ;
+          if(fellow_sz>0) LogBytes += fellow_sz ;
+          done.insert(fellow_filename);
+        }
+      }
+    }
+  }
 
   if(Aborted) return ;
 
@@ -695,17 +722,19 @@ void CMainDaemon::JobRotate()
       }
       string FileName = LogPath + pos->fname ;
       if(!file_is_existed(FileName)||DeleteFileA(FileName.c_str())) {
-        spaces[drv] += pos->fsize ;
-        LogFiles-- ;
+        __int64 bytes = pos->fsize ; LogFiles-- ;
         const vector<string> &FellowExts= JobRotations[ji].FellowSuffix ;
-        string fpathprefix = file_path_of(FileName)+file_prefix_of(FileName) ;
-        for(i=0;i<FellowExts.size();i++) {
+        string fpathprefix = file_path_of(FileName) + file_prefix_of(FileName) ;
+        for(size_t i=0;i<FellowExts.size();i++) {
           string fellow_filename = fpathprefix+FellowExts[i] ;
           __int64 fellow_sz = GetFileSize(fellow_filename) ;
           if(DeleteFileA(fellow_filename.c_str())) {
-            if(fellow_sz>0) spaces[drv] += fellow_sz ;
+            if(fellow_sz>0) bytes += fellow_sz ;
           }
         }
+        __int64 drv_space = GetDiskFreeSpaceFromFileName(drv) ;
+        if(drv_space>0) spaces[drv] = drv_space ;
+        else spaces[drv] += bytes ;
       }
     }
 
