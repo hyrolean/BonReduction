@@ -1190,11 +1190,11 @@ void CBonTuner::DoChannelKeeping()
       DWORD curSpace,curChannel ;
       if(GetCurrentTunedChannel(curSpace,curChannel)) {
         if(curSpace!=CurSpace||curChannel!=CurChannel) {
-          DWORD tuner = CurRTuner ;
           if(TunerPaths[CurRTuner].size()>=2) {
             AsyncTSSuspend_() ;
             if(FullLoad) Tuners[CurRTuner].Module = NULL ;
             Tuners[CurRTuner].Free() ;
+            RotateTunerCandidates(CurRTuner) ;
             AsyncTSResume_() ;
           }
           if(!SetVirtualChannel(CurSpace,CurChannel)) {
