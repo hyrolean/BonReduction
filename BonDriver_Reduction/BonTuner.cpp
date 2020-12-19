@@ -1025,10 +1025,7 @@ BOOL CBonTuner::SetVirtualChannel(const DWORD dwSpace, const DWORD dwChannel)
   if(VirtualToRealSpace(dwSpace,tuner,spc)) {
     size_t rotation_counter = TunerPaths[tuner].size() ;
     while(rotation_counter--) {
-      BOOL loaded = LoadTuner(tuner,false,false) ;
-      if(TunerPaths[tuner].size()>=2)
-        RotateTunerCandidates(tuner) ;
-      if(loaded) {
+      if(LoadTuner(tuner,false,false)) {
         if(Tuners[tuner].Tuner->SetChannel(spc,dwChannel)) {
           CurSpace = dwSpace ; CurChannel = dwChannel ;
           CurRTuner = tuner ; CurRSpace = spc ;
@@ -1038,6 +1035,7 @@ BOOL CBonTuner::SetVirtualChannel(const DWORD dwSpace, const DWORD dwChannel)
           break ;
         }
       }
+      RotateTunerCandidates(tuner) ;
       if(rotation_counter) {
         AsyncTSSuspend_() ;
         if(FullLoad) Tuners[tuner].Module = NULL ;
