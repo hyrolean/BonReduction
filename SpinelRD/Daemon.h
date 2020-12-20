@@ -41,23 +41,29 @@ typedef std::map<int,CDaemonTimer*> MAP_DaemonTimer ;
 
 //---------------------------------------------------------------------------
 
+  typedef std::vector<std::string> masks_t;
+
   struct TRotationItem {
-    std::string FileMask;
+    std::string FilePath;
+    masks_t Masks;
     size_t MaxFiles;
     int MaxDays;
     __int64 MaxBytes;
     bool SubDirectories;
-    std::vector<std::string> FellowSuffix ;
-    TRotationItem(std::string FileMask_,int MaxFiles_,int MaxDays_,
-      __int64 MaxBytes_,bool SubDirectories_=false,
-      const std::vector<std::string> &FellowSuffix_=std::vector<std::string>())
-      : FileMask(FileMask_),MaxFiles(MaxFiles_),MaxDays(MaxDays_),
-        MaxBytes(MaxBytes_),SubDirectories(SubDirectories_),FellowSuffix(FellowSuffix_)
-    {}
-    TRotationItem(const TRotationItem &src)
-      : FileMask(src.FileMask),MaxFiles(src.MaxFiles),MaxDays(src.MaxDays),
-        MaxBytes(src.MaxBytes),SubDirectories(src.SubDirectories),FellowSuffix(src.FellowSuffix)
-    {}
+    masks_t FellowMasks ;
+    TRotationItem(std::string FileMasks_,int MaxFiles_,int MaxDays_,
+      __int64 MaxBytes_,bool SubDirectories_=false,std::string FellowSuffix_="^")
+      : MaxFiles(MaxFiles_),MaxDays(MaxDays_),
+        MaxBytes(MaxBytes_),SubDirectories(SubDirectories_) {
+      FilePath = file_path_of(FileMasks_) ;
+      std::string MaskCSV = file_name_of(FileMasks_) ;
+      if(MaskCSV!="^") {
+        split(Masks,MaskCSV,',');
+      }
+      if(FellowSuffix_!="^") {
+        split(FellowMasks,FellowSuffix_,',');
+      }
+    }
   };
   typedef std::vector<TRotationItem> TRotations;
 
