@@ -13,6 +13,50 @@ namespace PRY8EAlByw {
 //---------------------------------------------------------------------------
 
 //===========================================================================
+// Statics
+//---------------------------------------------------------------------------
+static errno_t splitPath(
+   const string &path,
+   string *pDrv=NULL,
+   string *pDir=NULL,
+   string *pFname=NULL,
+   string *pExt=NULL,
+   UINT code_page=CP_ACP
+) {
+
+  wstring wpath = mbcs2wcs(path,code_page) ;
+
+  #define BUFALLOC(Nam) BUFFER<wchar_t> w##Nam(p##Nam?_MAX_FNAME:0)
+  BUFALLOC(Drv);
+  BUFALLOC(Dir);
+  BUFALLOC(Fname);
+  BUFALLOC(Ext);
+  #undef BUFALLOC
+
+  #define SPLPARAM(Nam) \
+     (p##Nam?w##Nam.data():NULL), \
+     (p##Nam?w##Nam.size():0)
+  errno_t r = _wsplitpath_s(
+     wpath.c_str(),
+     SPLPARAM(Drv),
+     SPLPARAM(Dir),
+     SPLPARAM(Fname),
+     SPLPARAM(Ext)
+  );
+  #undef SPLPARAM
+
+  if(!r) {
+    #define STOREVAL(Nam) if(p##Nam) *p##Nam = wcs2mbcs(w##Nam.data(),code_page)
+    STOREVAL(Drv) ;
+    STOREVAL(Dir) ;
+    STOREVAL(Fname) ;
+    STOREVAL(Ext) ;
+    #undef STOREVAL
+  }
+
+  return r ;
+}
+//===========================================================================
 // Functions
 //---------------------------------------------------------------------------
 DWORD Elapsed(DWORD start, DWORD end)
@@ -85,44 +129,37 @@ string lower_case(string str)
 //---------------------------------------------------------------------------
 string file_drive_of(string filename)
 {
-  char szDrive[_MAX_FNAME] ;
-  _splitpath_s( filename.c_str(), szDrive, _MAX_FNAME, NULL, 0
-    , NULL, 0, NULL, 0 ) ;
-  return string(szDrive) ;
+  string drv ;
+  splitPath(filename,&drv) ;
+  return drv ;
 }
 //---------------------------------------------------------------------------
 string file_path_of(string filename)
 {
-  char szDrive[_MAX_FNAME] ;
-  char szDir[_MAX_FNAME] ;
-  _splitpath_s( filename.c_str(), szDrive, _MAX_FNAME, szDir, _MAX_FNAME
-    , NULL, 0, NULL, 0 ) ;
-  return string(szDrive)+string(szDir) ;
+  string drv, dir ;
+  splitPath(filename,&drv,&dir) ;
+  return drv+dir ;
 }
 //---------------------------------------------------------------------------
 string file_name_of(string filename)
 {
-  char szName[_MAX_FNAME] ;
-  char szExt[_MAX_FNAME] ;
-  _splitpath_s( filename.c_str(), NULL, 0, NULL, 0
-    , szName, _MAX_FNAME, szExt, _MAX_FNAME ) ;
-  return string(szName)+string(szExt) ;
+  string name, ext ;
+  splitPath(filename,NULL,NULL,&name,&ext) ;
+  return name+ext ;
 }
 //---------------------------------------------------------------------------
 string file_prefix_of(string filename)
 {
-  char szName[_MAX_FNAME] ;
-  _splitpath_s( filename.c_str(), NULL, 0, NULL, 0
-    , szName, _MAX_FNAME, NULL, 0 ) ;
-  return string(szName) ;
+  string name;
+  splitPath(filename,NULL,NULL,&name) ;
+  return name ;
 }
 //---------------------------------------------------------------------------
 string file_suffix_of(string filename)
 {
-  char szExt[_MAX_FNAME] ;
-  _splitpath_s( filename.c_str(), NULL, 0, NULL, 0
-    , NULL, 0, szExt, _MAX_FNAME ) ;
-  return string(szExt) ;
+  string ext ;
+  splitPath(filename,NULL,NULL,NULL,&ext) ;
+  return ext ;
 }
 //---------------------------------------------------------------------------
 int file_age_of(string filename)
