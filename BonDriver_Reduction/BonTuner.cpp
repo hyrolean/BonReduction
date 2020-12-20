@@ -726,7 +726,7 @@ BOOL CBonTuner::LoadTuner(size_t tuner,bool tuning,bool rotating)
         reload_result = ReloadTunerModule(tuner) ;
         if(reload_result) break ;
         if(!rotating) break ;
-        RotateTunerCandidates(tuner);
+        if(n) RotateTunerCandidates(tuner);
       }
       if(!reload_result) break ;
     }
@@ -1035,11 +1035,11 @@ BOOL CBonTuner::SetVirtualChannel(const DWORD dwSpace, const DWORD dwChannel)
           break ;
         }
       }
-      RotateTunerCandidates(tuner) ;
       if(rotation_counter) {
         AsyncTSSuspend_() ;
         if(FullLoad) Tuners[tuner].Module = NULL ;
         Tuners[tuner].Free() ;
+        RotateTunerCandidates(tuner) ;
         AsyncTSResume_() ;
       }
     }
