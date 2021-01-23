@@ -652,7 +652,11 @@ void CMainDaemon::JobRotate()
         }
         spaces[drv]=space ;
       }
-      Stats.push_back(TStat(i,drv));
+      if( JobRotations[i].MaxFiles<INT_MAX ||
+          JobRotations[i].MaxDays<INT_MAX ||
+          spaces[drv]<-JobRotations[i].MaxBytes ) {
+        Stats.push_back(TStat(i,drv));
+      }
     }
 
     logset LogSet ;
