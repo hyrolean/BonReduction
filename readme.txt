@@ -130,8 +130,9 @@ BonDriver_RDCT ( BonDriver_Reduction )
 
 ■更新履歴
 
- version 1.5 rev.3
+ version 1.5 rev.4
 
+  ・チューナーオープン再試行時にチューナー候補を回し忘れていたバグを修正[rev.4]
   ・チャンネル切替時にチューナー候補を余計に回してしまうバグを修正[rev.3]
   ・チューナー候補の切替が上手くいかなくなることがある現象を修正[rev.2]
   ・チューナーオープンに費やす最大試行時間の項目 TunerRetryDuration をiniに追加

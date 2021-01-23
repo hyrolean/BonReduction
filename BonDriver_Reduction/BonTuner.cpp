@@ -763,6 +763,7 @@ BOOL CBonTuner::LoadTuner(size_t tuner,bool tuning,bool rotating)
             }
             if(FullLoad) Tuners[tuner].Module=NULL ;
             Tuners[tuner].Free() ;
+            if(n) RotateTunerCandidates(tuner);
             continue ;
           }
           MagicSent=FALSE ;
@@ -783,6 +784,7 @@ BOOL CBonTuner::LoadTuner(size_t tuner,bool tuning,bool rotating)
                   }
                   if(FullLoad) Tuners[tuner].Module=NULL ;
                   Tuners[tuner].Free() ;
+                  if(n) RotateTunerCandidates(tuner);
                   continue ;
                 }else
                   ResetChannel() ;

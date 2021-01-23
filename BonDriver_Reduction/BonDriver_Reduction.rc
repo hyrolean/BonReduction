@@ -4,8 +4,8 @@
 
 LANGUAGE LANG_JAPANESE, SUBLANG_DEFAULT
 1 VERSIONINFO
- FILEVERSION 1,5,3,22
- PRODUCTVERSION 1,5,3,22
+ FILEVERSION 1,5,4,23
+ PRODUCTVERSION 1,5,4,23
  FILEFLAGSMASK 0x17L
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -22,12 +22,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "PRY8EAlByw"
             VALUE "FileDescription", "BonDriver Reduction Wrapper DLL"
-            VALUE "FileVersion", "1,5,3,22"
+            VALUE "FileVersion", "1,5,4,23"
             VALUE "InternalName", "BonReduction"
-            VALUE "LegalCopyright", "PRY8EAlByw 2012-2020"
+            VALUE "LegalCopyright", "PRY8EAlByw 2012-2021"
             VALUE "OriginalFilename", "BonDriver_RDCT.dll"
             VALUE "ProductName", "BonDriver RDCT DLL"
-            VALUE "ProductVersion", "1,5,3,22"
+            VALUE "ProductVersion", "1,5,4,23"
         END
     END
     BLOCK "VarFileInfo"
