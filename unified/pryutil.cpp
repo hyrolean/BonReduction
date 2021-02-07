@@ -201,9 +201,8 @@ bool folder_is_existed(string filename)
       public:
         str_comp_f(bool match_case_) : match_case(match_case_) {}
         str_comp_f(const str_comp_f &src) : match_case(src.match_case) {}
-        bool operator()(string lhs, string rhs) const {
-          if(match_case) lhs < rhs ;
-          return lower_case(lhs) < lower_case(rhs) ;
+        bool operator()(const string lhs, const string rhs) const {
+          return match_case ? lhs < rhs : lower_case(lhs) < lower_case(rhs) ;
         }
       };
       typedef map<string,T,str_comp_f> const_map_t;
