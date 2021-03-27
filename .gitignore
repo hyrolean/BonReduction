@@ -42,12 +42,8 @@ build.bat
 ipch/
 Debug/
 Release/
-Intermediate/
+_intermediate_/
 *.user
 *.sdf
 *.VC.db
 
-# pt2wdm files
-PTwCtrl/inc/*.h
-PTwCtrl/lib/*.lib
-!PTwCtrl/inc/Prefix.h

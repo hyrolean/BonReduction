@@ -432,7 +432,7 @@ void CBonTuner::LoadIni()
     }
     //チューナーミューテックスの管理
     LOADINT(ManageTunerMutex) ;
-	LOADWSTR(TunerMutexPrefix) ;
+    LOADWSTR(TunerMutexPrefix) ;
     //スペース並替
     std::wstring SpaceArrangement=L"";
     LOADWSTR(SpaceArrangement) ;
@@ -974,14 +974,14 @@ LPCTSTR CBonTuner::EnumChannelName(const DWORD dwSpace, const DWORD dwChannel)
     if(dwSpace!=0) return NULL ;
     DWORD vspc,vch ;
     if(SerialToVirtualChannel(dwChannel,vspc,vch))
-		res = EnumVirtualChannelName(vspc,vch) ;
+        res = EnumVirtualChannelName(vspc,vch) ;
   }
   else
-  	res = EnumVirtualChannelName(dwSpace,dwChannel) ;
+    res = EnumVirtualChannelName(dwSpace,dwChannel) ;
   if(res)
-  	DBGOUT("EnumChannel: space=%d, channel=%d, name=%s\n",dwSpace,dwChannel,wcs2mbcs(res).c_str());
+    DBGOUT("EnumChannel: space=%d, channel=%d, name=%s\n",dwSpace,dwChannel,wcs2mbcs(res).c_str());
   else
-  	DBGOUT("EnumChannel: failed.\n");
+    DBGOUT("EnumChannel: failed.\n");
   return res ;
 }
 //-----
@@ -1050,7 +1050,7 @@ BOOL CBonTuner::SetVirtualChannel(const DWORD dwSpace, const DWORD dwChannel)
     while(rotation_counter--) {
       if(LoadTuner(tuner,false,false)) {
         BOOL tuned = Tuners[tuner].Tuner->SetChannel(spc,dwChannel) ;
-		if(!ChannelKeeping||tuned) {
+        if(!ChannelKeeping||tuned) {
           CurSpace = dwSpace ; CurChannel = dwChannel ;
           CurRTuner = tuner ; CurRSpace = spc ;
           CurHasSignal = Tuners[CurRTuner].Spaces[CurRSpace].Channels[CurChannel].HasSignal ;
@@ -1222,26 +1222,25 @@ const BOOL CBonTuner::SetChannel(const BYTE bCh)
 //-----
 void CBonTuner::DoChannelKeeping()
 {
-  if(ChannelKeeping) {
-    exclusive_lock lock(&Exclusive) ;
-    if(CurRTuner<Tuners.size()) {
-      if(Tuners[CurRTuner].Opening) {
-        if(Tuners[CurRTuner].Tuner) {
-          DWORD curSpace,curChannel ;
-          if(GetCurrentTunedChannel(curSpace,curChannel)) {
-            if(curSpace!=CurSpace||curChannel!=CurChannel) {
-              if(TunerPaths[CurRTuner].size()>=2) {
-                AsyncTSSuspend_() ;
-                if(FullLoad) Tuners[CurRTuner].Module = NULL ;
-                Tuners[CurRTuner].Free() ;
-                RotateTunerCandidates(CurRTuner) ;
-                AsyncTSResume_() ;
-              }
-              if(!SetVirtualChannel(CurSpace,CurChannel)) {
-                if(GetCurrentTunedChannel(curSpace,curChannel)) {
-                  //チューニング不可だった場合、現在のチャンネル情報に更新して諦める
-                  CurSpace = curSpace, CurChannel = curChannel ;
-                }
+  if (ChannelKeeping) {
+    exclusive_lock lock (&Exclusive) ;
+    if (CurRTuner < Tuners.size()) {
+      if (Tuners[CurRTuner].Tuner) {
+        DWORD curSpace, curChannel ;
+        if (GetCurrentTunedChannel(curSpace, curChannel)) {
+          if (curSpace != CurSpace || curChannel != CurChannel) {
+            if (TunerPaths[CurRTuner].size() >= 2) {
+              AsyncTSSuspend_() ;
+              if (FullLoad)
+                Tuners[CurRTuner].Module = NULL ;
+              Tuners[CurRTuner].Free() ;
+              RotateTunerCandidates(CurRTuner) ;
+              AsyncTSResume_() ;
+            }
+            if (!SetVirtualChannel(CurSpace, CurChannel)) {
+              if (GetCurrentTunedChannel(curSpace, curChannel)) {
+                //チューニング不可だった場合、現在のチャンネル情報に更新して諦める
+                CurSpace = curSpace, CurChannel = curChannel ;
               }
             }
           }
@@ -1394,15 +1393,15 @@ const BOOL CBonTuner::GetTsStream(BYTE **ppDst, DWORD *pdwSize, DWORD *pdwRemain
         AsyncTSFifo->Pop(ppDst,pdwSize,pdwRemain) ;
         Result=TRUE ;
       }
-	}
-	else {
-		exclusive_lock lock(&Exclusive);
-		if (CurRTuner < Tuners.size()) {
-			if (Tuners[CurRTuner].Tuner) {
-				Result = Tuners[CurRTuner].Tuner->GetTsStream(ppDst, pdwSize, pdwRemain);
-			}
-		}
-	}
+    }
+    else {
+        exclusive_lock lock(&Exclusive);
+        if (CurRTuner < Tuners.size()) {
+            if (Tuners[CurRTuner].Tuner) {
+                Result = Tuners[CurRTuner].Tuner->GetTsStream(ppDst, pdwSize, pdwRemain);
+            }
+        }
+    }
     if(Result) {
       if(SignalAsBitrate) {
         if(pdwSize) SignalBytesProceeded+=*pdwSize ;
