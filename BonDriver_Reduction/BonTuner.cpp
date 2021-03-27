@@ -2,6 +2,7 @@
 #include "stdafx.h"
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <assert.h>
+#include <MMSystem.h>
 #include <SetupApi.h>
 #include <Malloc.h>
 #include <InitGuid.h>
@@ -17,6 +18,7 @@
 #include "BonTuner.h"
 //---------------------------------------------------------------------------
 #pragma comment(lib, "WSock32.Lib")
+#pragma comment(lib, "WinMM.lib")
 
 using namespace std ;
 
@@ -269,10 +271,10 @@ CBonTuner::CBonTuner()
   FullOpen=0 ;
   FullScan=1 ;
   LazyOpen=1 ;
-  CheckOpening=1 ;
+  CheckOpening=0 ;
   CheckOpeningCloseOnFailure=1 ;
-  ByteTuning=1 ;
-  ByteTuningCancelResult=FALSE ;
+  ByteTuning=0 ;
+  ByteTuningCancelResult=TRUE ;
   RecordTransit=1 ;
   RecordTransitDir = "" ;
   SaveCurrent=1 ;
@@ -307,6 +309,9 @@ CBonTuner::CBonTuner()
   SignalBitrate=0.f ;
   SignalBytesProceeded=0 ;
   SignalTickProceeding=0 ;
+  MMTimerEnabled=FALSE;
+  MMTimerPeriod=10;
+  MMTimerCurEnabled=false;
 }
 //-----
 CBonTuner::~CBonTuner()
@@ -457,6 +462,9 @@ void CBonTuner::LoadIni()
     LOADINT(MagicSleep) ;
     //シグナルビットレート
     LOADINT(SignalAsBitrate) ;
+    //マルチメディアタイマー
+    LOADINT(MMTimerEnabled) ;
+    LOADINT(MMTimerPeriod) ;
   }
 
   if(SaveCurrent) {
@@ -773,9 +781,10 @@ BOOL CBonTuner::LoadTuner(size_t tuner,bool tuning,bool rotating)
           if(tuning) {
             if(CurRTuner==tuner) {
               BOOL channel_tuned = FALSE ;
-              if(Tuners[tuner].Opening)
+              if(Tuners[tuner].Opening) {
                 channel_tuned
                  = Tuners[tuner].Tuner->SetChannel(CurRSpace,CurChannel) ;
+              }
               if(!channel_tuned) {
                 if(n&&rotating) {
                   if(!TunerClosed) {
@@ -786,8 +795,9 @@ BOOL CBonTuner::LoadTuner(size_t tuner,bool tuning,bool rotating)
                   Tuners[tuner].Free() ;
                   if(n) RotateTunerCandidates(tuner);
                   continue ;
-                }else
+                }else {
                   ResetChannel() ;
+                }
               }
             }
           }
@@ -835,7 +845,7 @@ BOOL CBonTuner::VirtualToRealSpace(const DWORD dwSpace,DWORD &tuner,DWORD &spc)
         if(dwSpace+skipSpc<spc+n) {
           spc = dwSpace+skipSpc-spc ;
           return TRUE ;
-        }else if(LoadTuner(tuner)) {
+        }else if(LoadTuner(tuner,false)) {
           while(spc+n<=dwSpace+skipSpc) {
             LPCTSTR name = Tuners[tuner].Tuner->EnumTuningSpace(n) ;
             if(!name) {
@@ -869,7 +879,7 @@ BOOL CBonTuner::VirtualToRealSpace(const DWORD dwSpace,DWORD &tuner,DWORD &spc)
     }
     if(tuner>=TunerPaths.size())
       break ;
-  }while(LoadTuner(tuner)) ;
+  }while(LoadTuner(tuner,false)) ;
   return FALSE ;
 }
 //-----
@@ -880,8 +890,9 @@ BOOL CBonTuner::SerialToVirtualChannel(const DWORD SCh,DWORD &VSpace,DWORD &VCh)
   while(ch<=SCh) {
     if(!EnumVirtualChannelName(VSpace,VCh)) {
       VSpace++,VCh=0 ;
-      if(!EnumVirtualChannelName(VSpace,VCh))
+      if(!EnumVirtualChannelName(VSpace,VCh)) {
         return FALSE ;
+      }
     }
     if(ch==SCh) {
       return TRUE ;
@@ -898,8 +909,9 @@ BOOL CBonTuner::VirtualToSerialChannel(const DWORD VSpace,const DWORD VCh,DWORD 
   while(VSpace>=vspc) {
     if(!EnumVirtualChannelName(vspc,vch)) {
       vspc++,vch=0 ;
-      if(!EnumVirtualChannelName(vspc,vch))
+      if(!EnumVirtualChannelName(vspc,vch)) {
         return FALSE ;
+      }
     }
     if(vspc==VSpace) {
       if(vch==VCh) return TRUE ;
@@ -931,7 +943,7 @@ LPCTSTR CBonTuner::EnumVirtualChannelName(const DWORD dwSpace, const DWORD dwCha
     if(dwChannel<Tuners[tuner].Spaces[spc].Channels.size())
       return Tuners[tuner].Spaces[spc].Channels[dwChannel].Name.c_str() ;
     else if(Tuners[tuner].Spaces[spc].MaxChannel==-1) {
-      if(!LoadTuner(tuner)) return NULL ;
+      if(!LoadTuner(tuner,false)) return NULL ;
       DWORD n = static_cast<DWORD>(Tuners[tuner].Spaces[spc].Channels.size()) ;
       while(n<=dwChannel) {
         LPCTSTR name = Tuners[tuner].Tuner->EnumChannelName(spc,n) ;
@@ -955,13 +967,20 @@ LPCTSTR CBonTuner::EnumChannelName(const DWORD dwSpace, const DWORD dwChannel)
 {
   DoFullScan() ;
   exclusive_lock lock(&Exclusive) ;
+  LPCTSTR res=NULL;
   if(SpaceConcat) {
     if(dwSpace!=0) return NULL ;
     DWORD vspc,vch ;
-    if(!SerialToVirtualChannel(dwChannel,vspc,vch)) return NULL ;
-    return EnumVirtualChannelName(vspc,vch) ;
+    if(SerialToVirtualChannel(dwChannel,vspc,vch))
+		res = EnumVirtualChannelName(vspc,vch) ;
   }
-  return EnumVirtualChannelName(dwSpace,dwChannel) ;
+  else
+  	res = EnumVirtualChannelName(dwSpace,dwChannel) ;
+  if(res)
+  	DBGOUT("EnumChannel: space=%d, channel=%d, name=%s\n",dwSpace,dwChannel,wcs2mbcs(res).c_str());
+  else
+  	DBGOUT("EnumChannel: failed.\n");
+  return res ;
 }
 //-----
 BOOL CBonTuner::GetCurrentTunedChannel(DWORD &curSpace,DWORD &curChannel)
@@ -1028,12 +1047,13 @@ BOOL CBonTuner::SetVirtualChannel(const DWORD dwSpace, const DWORD dwChannel)
     size_t rotation_counter = TunerPaths[tuner].size() ;
     while(rotation_counter--) {
       if(LoadTuner(tuner,false,false)) {
-        if(Tuners[tuner].Tuner->SetChannel(spc,dwChannel)) {
+        BOOL tuned = Tuners[tuner].Tuner->SetChannel(spc,dwChannel) ;
+		if(!ChannelKeeping||tuned) {
           CurSpace = dwSpace ; CurChannel = dwChannel ;
           CurRTuner = tuner ; CurRSpace = spc ;
           CurHasSignal = Tuners[CurRTuner].Spaces[CurRSpace].Channels[CurChannel].HasSignal ;
-          CurHasStream = Tuners[CurRTuner].Spaces[CurRSpace].Channels[CurChannel].HasStream ;
-          Result = TRUE ;
+          CurHasStream = tuned ? Tuners[CurRTuner].Spaces[CurRSpace].Channels[CurChannel].HasStream : FALSE ;
+          Result = tuned ;
           break ;
         }
       }
@@ -1091,7 +1111,9 @@ const BOOL CBonTuner::SetChannel(const DWORD dwSpace, const DWORD dwChannel)
   if(SpaceConcat) {
     if(dwSpace!=0) return FALSE ;
     DWORD vspc = 0 ,vch = 0 ;
-    if(!SerialToVirtualChannel(dwChannel,vspc,vch)) return FALSE ;
+    if(!SerialToVirtualChannel(dwChannel,vspc,vch)) {
+        return FALSE ;
+    }
     return SetVirtualChannel(vspc,vch) ;
   }
   return SetVirtualChannel(dwSpace,dwChannel) ;
@@ -1147,12 +1169,18 @@ const BOOL CBonTuner::OpenTuner(void)
     OpenTunerOrdered = FALSE ;
     return FALSE ;
   }
-  DoFullScan();
   if(SignalAsBitrate) {
     SignalTickProceeding=GetTickCount() ;
     SignalBytesProceeded=0;
     SignalBitrate=0.f;
   }
+  if(MMTimerEnabled) {
+    if(!MMTimerCurEnabled) {
+      timeBeginPeriod(MMTimerPeriod);
+      MMTimerCurEnabled=true;
+    }
+  }
+  DoFullScan();
   AsyncTSBegin() ;
   DBGOUT("Tuner Opened.\r\n");
   return TRUE ;
@@ -1172,6 +1200,12 @@ void CBonTuner::CloseTuner(void)
       Tuners[tuner].Free() ;
     }
   }
+  if(MMTimerEnabled) {
+    if(MMTimerCurEnabled) {
+      timeEndPeriod(MMTimerPeriod);
+      MMTimerCurEnabled=false;
+    }
+  }
   DBGOUT("Tuner Closed.\r\n");
 }
 //-----
@@ -1188,21 +1222,25 @@ void CBonTuner::DoChannelKeeping()
 {
   if(ChannelKeeping) {
     exclusive_lock lock(&Exclusive) ;
-    if(LoadTuner(CurRTuner)) {
-      DWORD curSpace,curChannel ;
-      if(GetCurrentTunedChannel(curSpace,curChannel)) {
-        if(curSpace!=CurSpace||curChannel!=CurChannel) {
-          if(TunerPaths[CurRTuner].size()>=2) {
-            AsyncTSSuspend_() ;
-            if(FullLoad) Tuners[CurRTuner].Module = NULL ;
-            Tuners[CurRTuner].Free() ;
-            RotateTunerCandidates(CurRTuner) ;
-            AsyncTSResume_() ;
-          }
-          if(!SetVirtualChannel(CurSpace,CurChannel)) {
-            if(GetCurrentTunedChannel(curSpace,curChannel)) {
-              //チューニング不可だった場合、現在のチャンネル情報に更新して諦める
-              CurSpace = curSpace, CurChannel = curChannel ;
+    if(CurRTuner<Tuners.size()) {
+      if(Tuners[CurRTuner].Opening) {
+        if(Tuners[CurRTuner].Tuner) {
+          DWORD curSpace,curChannel ;
+          if(GetCurrentTunedChannel(curSpace,curChannel)) {
+            if(curSpace!=CurSpace||curChannel!=CurChannel) {
+              if(TunerPaths[CurRTuner].size()>=2) {
+                AsyncTSSuspend_() ;
+                if(FullLoad) Tuners[CurRTuner].Module = NULL ;
+                Tuners[CurRTuner].Free() ;
+                RotateTunerCandidates(CurRTuner) ;
+                AsyncTSResume_() ;
+              }
+              if(!SetVirtualChannel(CurSpace,CurChannel)) {
+                if(GetCurrentTunedChannel(curSpace,curChannel)) {
+                  //チューニング不可だった場合、現在のチャンネル情報に更新して諦める
+                  CurSpace = curSpace, CurChannel = curChannel ;
+                }
+              }
             }
           }
         }
@@ -1232,8 +1270,13 @@ const float CBonTuner::GetSignalLevel(void)
         if (result > 100.f) result = 0.f;
     }
   }else {
-    if(LoadTuner(CurRTuner))
-      result = Tuners[CurRTuner].Tuner->GetSignalLevel() ;
+    if(CurRTuner<Tuners.size()) {
+      if(Tuners[CurRTuner].Opening) {
+        if(Tuners[CurRTuner].Tuner) {
+          result = Tuners[CurRTuner].Tuner->GetSignalLevel() ;
+        }
+      }
+    }
   }
   return result ;
 }
@@ -1257,8 +1300,13 @@ const DWORD CBonTuner::WaitTsStream(const DWORD dwTimeOut)
       return AsyncTSRecvEvent->wait(dwTimeOut) ; ;
     }else {
       exclusive_lock lock(&Exclusive) ;
-      if(LoadTuner(CurRTuner))
-        return Tuners[CurRTuner].Tuner->WaitTsStream(dwTimeOut) ;
+      if(CurRTuner<Tuners.size()) {
+        if(Tuners[CurRTuner].Opening) {
+          if(Tuners[CurRTuner].Tuner) {
+            return Tuners[CurRTuner].Tuner->WaitTsStream(dwTimeOut) ;
+          }
+        }
+      }
     }
   }
   if(dwTimeOut&&dwTimeOut!=INFINITE)
@@ -1281,8 +1329,11 @@ const DWORD CBonTuner::GetReadyCount(void)
       }
     }else {
       exclusive_lock lock(&Exclusive) ;
-      if(LoadTuner(CurRTuner))
-        return Tuners[CurRTuner].Tuner->GetReadyCount() ;
+      if(CurRTuner<Tuners.size()) {
+        if(Tuners[CurRTuner].Tuner) {
+          return Tuners[CurRTuner].Tuner->GetReadyCount() ;
+        }
+      }
     }
   }
   return 0 ;
@@ -1311,8 +1362,11 @@ const BOOL CBonTuner::GetTsStream(BYTE *pDst, DWORD *pdwSize, DWORD *pdwRemain)
       }
     }else {
       exclusive_lock lock(&Exclusive) ;
-      if(LoadTuner(CurRTuner))
-        Result = Tuners[CurRTuner].Tuner->GetTsStream(pDst,pdwSize,pdwRemain) ;
+      if(CurRTuner<Tuners.size()) {
+        if(Tuners[CurRTuner].Tuner) {
+          Result = Tuners[CurRTuner].Tuner->GetTsStream(pDst,pdwSize,pdwRemain) ;
+        }
+      }
     }
     if(Result) {
       if(SignalAsBitrate) {
@@ -1338,11 +1392,15 @@ const BOOL CBonTuner::GetTsStream(BYTE **ppDst, DWORD *pdwSize, DWORD *pdwRemain
         AsyncTSFifo->Pop(ppDst,pdwSize,pdwRemain) ;
         Result=TRUE ;
       }
-    }else {
-      exclusive_lock lock(&Exclusive) ;
-      if(LoadTuner(CurRTuner))
-        Result = Tuners[CurRTuner].Tuner->GetTsStream(ppDst,pdwSize,pdwRemain) ;
-    }
+	}
+	else {
+		exclusive_lock lock(&Exclusive);
+		if (CurRTuner < Tuners.size()) {
+			if (Tuners[CurRTuner].Tuner) {
+				Result = Tuners[CurRTuner].Tuner->GetTsStream(ppDst, pdwSize, pdwRemain);
+			}
+		}
+	}
     if(Result) {
       if(SignalAsBitrate) {
         if(pdwSize) SignalBytesProceeded+=*pdwSize ;
@@ -1359,19 +1417,27 @@ const BOOL CBonTuner::GetTsStream(BYTE **ppDst, DWORD *pdwSize, DWORD *pdwRemain
 //-----
 void CBonTuner::DoDropStream()
 {
-  BYTE **ppDst=NULL; DWORD *pdwSize=NULL, *pdwRemain=NULL;
-  if(AsyncTSEnabled) {
+  if (AsyncTSEnabled) {
     exclusive_lock alock(&AsyncTSExclusive) ;
-    if(AsyncTSFifo) {
-      if(AsyncTSFifo->Size()>0)
-        AsyncTSFifo->Pop(ppDst,pdwSize,pdwRemain) ;
-
+    if (AsyncTSFifo) {
+      for (size_t n = AsyncTSFifo->Size();n > 0;n--) {
+        BYTE *pDst = NULL;
+        DWORD dwSize = 0, dwRemain = 0;
+        if (!AsyncTSFifo->Pop(&pDst, &dwSize, &dwRemain))
+          break;
+      }
     }
   }else {
-    exclusive_lock lock(&Exclusive) ;
-    if(LoadTuner(CurRTuner)) {
-      if(Tuners[CurRTuner].Tuner->GetReadyCount()>0)
-        Tuners[CurRTuner].Tuner->GetTsStream(ppDst,pdwSize,pdwRemain) ;
+    exclusive_lock lock (&Exclusive);
+    if (CurRTuner < Tuners.size()) {
+      if (Tuners[CurRTuner].Tuner) {
+        for (DWORD n = Tuners[CurRTuner].Tuner->GetReadyCount();n > 0;n--) {
+          BYTE *pDst = NULL;
+          DWORD dwSize = 0, dwRemain = 0;
+          if (!Tuners[CurRTuner].Tuner->GetTsStream(&pDst, &dwSize, &dwRemain))
+            break;
+        }
+      }
     }
   }
 }

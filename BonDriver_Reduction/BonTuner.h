@@ -146,6 +146,9 @@ protected:
   float SignalBitrate ;
   DWORD SignalBytesProceeded ;
   DWORD SignalTickProceeding ;
+  BOOL MMTimerEnabled;
+  UINT MMTimerPeriod;
+  bool MMTimerCurEnabled;
 
 protected:
   std::string MakeModuleFileName() ;
