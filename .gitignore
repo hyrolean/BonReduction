@@ -48,4 +48,5 @@ VS2008/
 *.sdf
 *.VC.db
 *.aps
-
+*.ncb
+*.suo
