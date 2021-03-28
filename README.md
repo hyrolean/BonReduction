@@ -143,6 +143,7 @@ BonDriver_RDCT ( BonDriver_Reduction )
 
 - version 1.5 rev.5++
 
+  - ミューテックスの分類項目 TunerMutexAvoidPrefix をiniに追加[rev.5++(rev.)]
   - ミューテックスの使用だけを把握する項目 AvoidTunerMutex をiniに追加[rev.5++]
   - ミューテックスの分類が出来る項目 TunerMutexPrefix をiniに追加[rev.5+]
   - 割込みタイマーの精度を高める項目 MMTimerEnabled をiniに追加[rev.5]
