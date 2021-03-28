@@ -18,7 +18,7 @@ BonDriver_RDCT ( BonDriver_Reduction )
 
   Spinel以外にも以下のBonDriverについては、一応、ラッパーとして動作することを
   確認済(**要:v1.5r5以降**)。
-  
+
   - [BonDriver_PTx-ST](https://github.com/hyrolean/BonDriver_PTx-ST_mod)
   - [BonDriver_PTxWDM](https://github.com/hyrolean/BonPTxWDM)
   - [BonDriver_FSHybrid](https://pastebin.com/u/HYROLEAN)
@@ -141,8 +141,9 @@ BonDriver_RDCT ( BonDriver_Reduction )
 
 ## ■更新履歴
 
-- version 1.5 rev.5+
+- version 1.5 rev.5++
 
+  - ミューテックスの使用だけを把握する項目 AvoidTunerMutex をiniに追加[rev.5++]
   - ミューテックスの分類が出来る項目 TunerMutexPrefix をiniに追加[rev.5+]
   - 割込みタイマーの精度を高める項目 MMTimerEnabled をiniに追加[rev.5]
   - チューナーオープン再試行時にチューナー候補を回し忘れていたバグを修正[rev.4]
