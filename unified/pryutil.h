@@ -31,6 +31,8 @@ std::wstring itows(int val,int radix=10);
 std::string upper_case(std::string str) ;
 std::string lower_case(std::string str) ;
 
+std::string str_printf(const char *format, ...);
+
 std::string file_drive_of(std::string filename);
 std::string file_path_of(std::string filename);
 std::string file_name_of(std::string filename);

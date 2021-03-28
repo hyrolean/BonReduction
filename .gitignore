@@ -43,7 +43,9 @@ ipch/
 Debug/
 Release/
 _intermediate_/
+VS2008/
 *.user
 *.sdf
 *.VC.db
+*.aps
 

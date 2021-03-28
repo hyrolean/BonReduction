@@ -249,6 +249,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\SpinelRD.exe.manifest"
+				>
+			</File>
+			<File
 				RelativePath=".\SpinelRD.ico"
 				>
 			</File>

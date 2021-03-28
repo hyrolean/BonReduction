@@ -80,9 +80,11 @@ private:
   CDaemonTimer *ResumeTimer;
   CDaemonTimer *JobTimer;
   std::string AppExeName();
+  exclusive_object exclLog;
 protected:
   bool Suspended, Resumed, EndSession, JobAborted ;
   BOOL DAEMONShowTaskIcon ;
+  BOOL DAEMONLogEnabled ;
   BOOL DAEMONJobPause ;
   int DAEMONThreadPriority ;
   BOOL SpinelEnabled ;
@@ -120,6 +122,7 @@ public:
   CMainDaemon();
   void Initialize(HINSTANCE InstanceHandle, HWND MainWindowHandle);
   void Finalize();
+  void LogOut(const char* format, ...) ;
 };
 
 extern CMainDaemon MainDaemon;

@@ -61,6 +61,8 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 		}
 	}
 
+	MainDaemon.Finalize();
+
 	return (int) msg.wParam;
 }
 
@@ -183,7 +185,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		defProc = TRUE;
 		break;
 	case WM_DESTROY:
-		MainDaemon.Finalize();
 		PostQuitMessage(0);
 		break;
 	case WM_POWERBROADCAST:
@@ -216,6 +217,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		SetWindowPos(hDlg, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 		SendMessage(hDlg,WM_SETICON,ICON_SMALL,
 			(LPARAM)LoadImage(hInst, MAKEINTRESOURCE(IDI_SMALL), IMAGE_ICON, 16, 16, 0));
+		SetWindowText(GetDlgItem(hDlg,IDC_STATIC_VER),_T(SPINELRD_VER));
 		return (INT_PTR)TRUE;
 
 	case WM_COMMAND:

@@ -11,7 +11,7 @@
 #define TRACE(...) do{ wchar_t d_buff[128]; \
 	_snwprintf_s(d_buff,128, __VA_ARGS__); \
 	::OutputDebugStringW(d_buff);}while(0)
-	bool __inline DBGOUT( const char* format,... )
+	void __inline DBGOUT( const char* format,... )
 	{
 		va_list marker ;
 		va_start( marker, format ) ;
@@ -19,10 +19,8 @@
 		if(edit_ln++>0) {
 			char *edit_str = static_cast<char*>(alloca(edit_ln)) ;
 			vsprintf_s( edit_str, edit_ln, format, marker ) ;
-			va_end( marker ) ;
 			#ifndef DEBUG_TO_X_DRIVE
 			OutputDebugStringA(edit_str) ;
-			return true;
 			#else
 			{
 				FILE *fp = NULL ;
@@ -30,12 +28,11 @@
 				if(fp) {
 					fputs(edit_str,fp) ;
 					fclose(fp) ;
-					return true;
 				}
 			}
 			#endif
 		}
-		return false;
+		va_end( marker ) ;
 	}
 	#define LINEDEBUG DBGOUT("%s(%d): passed.\n",__FILE__,__LINE__)
 #else

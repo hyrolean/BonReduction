@@ -67,4 +67,9 @@
   <ItemGroup>
     <Text Include="ReadMe.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="SpinelRD.exe.manifest">
+      <Filter>リソース ファイル</Filter>
+    </Manifest>
+  </ItemGroup>
 </Project>
