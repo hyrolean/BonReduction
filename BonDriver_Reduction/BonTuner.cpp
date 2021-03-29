@@ -279,7 +279,6 @@ CBonTuner::CBonTuner()
   RecordTransitDir = "" ;
   SaveCurrent=1 ;
   AvoidTunerMutex=0 ;
-  TunerMutexAvoidPrefix= L"";
   ManageTunerMutex=0 ;
   TunerMutexPrefix = L"" ;
   SpaceConcat=0 ;
@@ -434,11 +433,14 @@ void CBonTuner::LoadIni()
     }
     //チューナーミューテックスの管理
     LOADINT(AvoidTunerMutex) ;
+    std::wstring TunerMutexAvoidPrefix=L"";
     LOADWSTR(TunerMutexAvoidPrefix) ;
-	LOADINT(ManageTunerMutex) ;
-	if(ManageTunerMutex) AvoidTunerMutex=1 ;
+    split(TunerMutexAvoidPrefixNames,TunerMutexAvoidPrefix,',');
+    LOADINT(ManageTunerMutex) ;
+    if(ManageTunerMutex) AvoidTunerMutex=1 ;
     LOADWSTR(TunerMutexPrefix) ;
-	if(TunerMutexAvoidPrefix.empty()) TunerMutexAvoidPrefix=TunerMutexPrefix;
+    if(TunerMutexAvoidPrefix.empty())
+        TunerMutexAvoidPrefixNames.push_back(TunerMutexPrefix);
     //スペース並替
     std::wstring SpaceArrangement=L"";
     LOADWSTR(SpaceArrangement) ;
@@ -673,17 +675,21 @@ BOOL CBonTuner::ReloadTunerModule(size_t tuner, bool forceReload)
   Tuners[tuner].Free() ;
 
   string tunerPath = TunerPaths[tuner].front() ;
-  wstring mutexName = L"BonReduction_"+TunerMutexPrefix+mbcs2wcs(file_prefix_of(tunerPath)) ;
-  wstring avoidMutexName = L"BonReduction_"+TunerMutexAvoidPrefix+mbcs2wcs(file_prefix_of(tunerPath)) ;
 
   if(AvoidTunerMutex) {
-    if(HANDLE Mutex = OpenMutex(MUTEX_ALL_ACCESS, FALSE, avoidMutexName.c_str())) {
-      // 既に使用中
-      CloseHandle(Mutex) ;
-      return FALSE ;
+    for(size_t i=0;i<TunerMutexAvoidPrefixNames.size();i++) {
+      wstring prefix = TunerMutexAvoidPrefixNames[i];
+	  wstring name = L"BonReduction_"+prefix+mbcs2wcs(file_prefix_of(tunerPath)) ;
+      if(HANDLE Mutex = OpenMutex(MUTEX_ALL_ACCESS, FALSE, name.c_str())) {
+        // 既に使用中
+        CloseHandle(Mutex) ;
+        return FALSE ;
+      }
     }
-    if(ManageTunerMutex)
-		Tuners[tuner].Mutex = CreateMutex(NULL, TRUE, mutexName.c_str()) ;
+    if(ManageTunerMutex) {
+	    wstring name = L"BonReduction_"+TunerMutexPrefix+mbcs2wcs(file_prefix_of(tunerPath)) ;
+        Tuners[tuner].Mutex = CreateMutex(NULL, TRUE, name.c_str()) ;
+	}
   }
 
   if(!forceReload) {

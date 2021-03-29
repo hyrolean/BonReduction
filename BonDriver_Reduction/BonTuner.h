@@ -113,7 +113,7 @@ protected:
   BOOL ByteTuning ;
   BOOL ByteTuningCancelResult ;
   BOOL AvoidTunerMutex ;
-  std::wstring TunerMutexAvoidPrefix ;
+  std::vector<std::wstring> TunerMutexAvoidPrefixNames ;
   BOOL ManageTunerMutex ;
   std::wstring TunerMutexPrefix ;
   std::vector<std::wstring> SpaceArrangeNames ;
