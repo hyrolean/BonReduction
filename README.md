@@ -141,8 +141,9 @@ BonDriver_RDCT ( BonDriver_Reduction )
 
 ## ■更新履歴
 
-- version 1.5 rev.5++(rev.2)
+- version 1.5 rev.6
 
+  - IBonDriver2 インスタンス取得時に dynamic_cast を使用する仕様に変更[rev.6]
   - ミューテックスの分類項目 TunerMutexAvoidPrefix をiniに追加[rev.5++(rev.2)]
   - ミューテックスの使用だけを把握する項目 AvoidTunerMutex をiniに追加[rev.5++]
   - ミューテックスの分類が出来る項目 TunerMutexPrefix をiniに追加[rev.5+]

@@ -124,6 +124,8 @@ protected:
   DWORD AsyncTSPacketSize ;
   DWORD AsyncTSQueueNum ;
   DWORD AsyncTSQueueMax ;
+  DWORD AsyncTSQueueStart ;
+  DWORD AsyncTSQueueCurStart ;
   DWORD AsyncTSEmptyBorder ;
   DWORD AsyncTSEmptyLimit ;
   BOOL AsyncTSModerateAllocating ;

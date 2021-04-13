@@ -1,17 +1,13 @@
 #pragma once
 
-#define DEBUG_TO_X_DRIVE
-
 #ifdef _DEBUG
+#define DEBUG_TO_X_DRIVE
+#endif
+
 #include <stdio.h>
 #include <stdarg.h>
-#define DBG_INFO(...) do{ char d_buff[128]; \
-	_snprintf_s(d_buff,128, __VA_ARGS__); \
-	::OutputDebugStringA(d_buff);}while(0)
-#define TRACE(...) do{ wchar_t d_buff[128]; \
-	_snwprintf_s(d_buff,128, __VA_ARGS__); \
-	::OutputDebugStringW(d_buff);}while(0)
-	void __inline DBGOUT( const char* format,... )
+
+	void __inline debug_printf( const char* format,... )
 	{
 		va_list marker ;
 		va_start( marker, format ) ;
@@ -34,6 +30,15 @@
 		}
 		va_end( marker ) ;
 	}
+
+#ifdef _DEBUG
+#define DBG_INFO(...) do{ char d_buff[128]; \
+	_snprintf_s(d_buff,128, __VA_ARGS__); \
+	::OutputDebugStringA(d_buff);}while(0)
+#define TRACE(...) do{ wchar_t d_buff[128]; \
+	_snwprintf_s(d_buff,128, __VA_ARGS__); \
+	::OutputDebugStringW(d_buff);}while(0)
+	#define DBGOUT(...) debug_printf(__VA_ARGS__)
 	#define LINEDEBUG DBGOUT("%s(%d): passed.\n",__FILE__,__LINE__)
 #else
 #define DBG_INFO(...) /*empty*/
@@ -42,3 +47,7 @@
 #define LINEDEBUG /*empty*/
 #endif
 
+#define ERROUT(...) do { \
+		debug_printf("%s(%d): ",__FILE__,__LINE__);\
+		debug_printf(__VA_ARGS__); \
+	}while(0)

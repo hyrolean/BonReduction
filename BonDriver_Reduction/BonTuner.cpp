@@ -288,6 +288,8 @@ CBonTuner::CBonTuner()
   AsyncTSPacketSize = 131072 ;
   AsyncTSQueueNum = 20 ;
   AsyncTSQueueMax = 100 ;
+  AsyncTSQueueStart = 5 ;
+  AsyncTSQueueCurStart = 0 ;
   AsyncTSEmptyBorder = 10 ;
   AsyncTSEmptyLimit = 5 ;
   AsyncTSModerateAllocating = TRUE ;
@@ -456,6 +458,7 @@ void CBonTuner::LoadIni()
     LOADINT(AsyncTSPacketSize) ;
     LOADINT(AsyncTSQueueNum) ;
     LOADINT(AsyncTSQueueMax) ;
+    LOADINT(AsyncTSQueueStart) ;
     LOADINT(AsyncTSEmptyBorder) ;
     LOADINT(AsyncTSEmptyLimit) ;
     LOADINT(AsyncTSModerateAllocating) ;
@@ -679,7 +682,7 @@ BOOL CBonTuner::ReloadTunerModule(size_t tuner, bool forceReload)
   if(AvoidTunerMutex) {
     for(size_t i=0;i<TunerMutexAvoidPrefixNames.size();i++) {
       wstring prefix = TunerMutexAvoidPrefixNames[i];
-	  wstring name = L"BonReduction_"+prefix+mbcs2wcs(file_prefix_of(tunerPath)) ;
+      wstring name = L"BonReduction_"+prefix+mbcs2wcs(file_prefix_of(tunerPath)) ;
       if(HANDLE Mutex = OpenMutex(MUTEX_ALL_ACCESS, FALSE, name.c_str())) {
         // 既に使用中
         CloseHandle(Mutex) ;
@@ -687,9 +690,9 @@ BOOL CBonTuner::ReloadTunerModule(size_t tuner, bool forceReload)
       }
     }
     if(ManageTunerMutex) {
-	    wstring name = L"BonReduction_"+TunerMutexPrefix+mbcs2wcs(file_prefix_of(tunerPath)) ;
+        wstring name = L"BonReduction_"+TunerMutexPrefix+mbcs2wcs(file_prefix_of(tunerPath)) ;
         Tuners[tuner].Mutex = CreateMutex(NULL, TRUE, name.c_str()) ;
-	}
+    }
   }
 
   if(!forceReload) {
@@ -716,8 +719,22 @@ BOOL CBonTuner::ReloadTunerModule(size_t tuner, bool forceReload)
   if(Tuners[tuner].Module) {
     CREATEBONDRIVER CreateBonDriver_
       = (CREATEBONDRIVER) GetProcAddress(Tuners[tuner].Module,"CreateBonDriver") ;
-    if(CreateBonDriver_)
-      Tuners[tuner].Tuner = static_cast<IBonDriver2*>(CreateBonDriver_()) ;
+	if(CreateBonDriver_) {
+		IBonDriver *BonDriver1 = NULL ;
+		try {
+			BonDriver1 = CreateBonDriver_() ;
+			try {
+				Tuners[tuner].Tuner = dynamic_cast<IBonDriver2*>(BonDriver1) ;
+			} catch(bad_cast &e) {
+				ERROUT("IBonDriver2 bad cast: %s\n",e.what());
+				throw e;
+			}
+		} catch(...) {
+			ERROUT("IBonDriver instance creation failed.\n");
+			if(BonDriver1) BonDriver1->Release();
+			Tuners[tuner].Tuner = NULL;
+		}
+	}
   }
   return Tuners[tuner].Tuner!=NULL ? TRUE : FALSE ;
 }
@@ -1340,14 +1357,14 @@ const DWORD CBonTuner::GetReadyCount(void)
     if(AsyncTSEnabled) {
       exclusive_lock alock(&AsyncTSExclusive) ;
       if(AsyncTSFifo) {
-        return (DWORD)AsyncTSFifo->Size() ;
+        if(AsyncTSFifo->Size()>AsyncTSQueueCurStart)
+          return (DWORD)AsyncTSFifo->Size()-AsyncTSQueueCurStart ;
       }
     }else {
       exclusive_lock lock(&Exclusive) ;
       if(CurRTuner<Tuners.size()) {
-        if(Tuners[CurRTuner].Tuner) {
+        if(Tuners[CurRTuner].Tuner)
           return Tuners[CurRTuner].Tuner->GetReadyCount() ;
-        }
       }
     }
   }
@@ -1367,12 +1384,23 @@ const BOOL CBonTuner::GetTsStream(BYTE *pDst, DWORD *pdwSize, DWORD *pdwRemain)
       exclusive_lock alock(&AsyncTSExclusive) ;
       if(AsyncTSFifo) {
         BYTE *pSrc ;
-        if(AsyncTSFifo->Pop(&pSrc,pdwSize,pdwRemain)) {
-          alock.unlock() ;
-          if(*pdwSize) {
-            CopyMemory(pDst,pSrc,*pdwSize) ;
+        if(AsyncTSFifo->Size()>AsyncTSQueueCurStart) {
+          if(AsyncTSFifo->Pop(&pSrc,pdwSize,pdwRemain)) {
+            if(AsyncTSQueueCurStart>0) {
+              if(pdwRemain) {
+                if(AsyncTSFifo->Size()>AsyncTSQueueCurStart)
+                  *pdwRemain = (DWORD)AsyncTSFifo->Size()-AsyncTSQueueCurStart;
+                else
+                  *pdwRemain = 0 ;
+              }
+              AsyncTSQueueCurStart--;
+            }
+            alock.unlock() ;
+            if(*pdwSize) {
+              CopyMemory(pDst,pSrc,*pdwSize) ;
+            }
+            Result=TRUE ;
           }
-          Result = TRUE ;
         }
       }
     }else {
@@ -1404,8 +1432,20 @@ const BOOL CBonTuner::GetTsStream(BYTE **ppDst, DWORD *pdwSize, DWORD *pdwRemain
     if(AsyncTSEnabled) {
       exclusive_lock alock(&AsyncTSExclusive) ;
       if(AsyncTSFifo) {
-        AsyncTSFifo->Pop(ppDst,pdwSize,pdwRemain) ;
-        Result=TRUE ;
+        if(AsyncTSFifo->Size()>AsyncTSQueueCurStart) {
+          if(AsyncTSFifo->Pop(ppDst,pdwSize,pdwRemain)) {
+            if(AsyncTSQueueCurStart>0) {
+              if(pdwRemain) {
+                if(AsyncTSFifo->Size()>AsyncTSQueueCurStart)
+                  *pdwRemain = (DWORD)AsyncTSFifo->Size()-AsyncTSQueueCurStart;
+                else
+                  *pdwRemain = 0 ;
+              }
+              AsyncTSQueueCurStart--;
+            }
+            Result=TRUE ;
+          }
+        }
       }
     }
     else {
@@ -1470,6 +1510,7 @@ void CBonTuner::PurgeTsStream(void)
     exclusive_lock alock(&AsyncTSExclusive) ;
     if(AsyncTSFifo)
       AsyncTSFifo->Purge() ;
+    AsyncTSQueueCurStart = AsyncTSQueueStart ;
   }
 }
 //-----
@@ -1575,7 +1616,8 @@ unsigned int CBonTuner::AsyncTSRecvThreadProcMain()
         }
       }while(r&&dwSize&&dwRemain) ;
       if(n) {
-        AsyncTSRecvEvent->set() ;
+        if(AsyncTSFifo->Size()>AsyncTSQueueCurStart)
+          AsyncTSRecvEvent->set() ;
       }
     }/*else if(rWait==WAIT_FAILED)
       break ;*/
@@ -1632,7 +1674,7 @@ BOOL CBonTuner::SendMagic()
           mc.Close() ;
         }
       }else {
-        DBGOUT("SendMagic: MAC \"%s\" の記述に間違いがある。\r\n",mac.c_str());
+        ERROUT("SendMagic: MAC \"%s\" の記述に間違いがある。\r\n",mac.c_str());
       }
     }
   }
