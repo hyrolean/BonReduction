@@ -632,6 +632,8 @@ bool CMainDaemon::LaunchSpinel()
         do {
             if(pAborted&&*pAborted) break ;
             if(!(Data.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)) continue ;
+            if(Data.dwFileAttributes&FILE_ATTRIBUTE_READONLY) continue ;
+            if(Data.dwFileAttributes&FILE_ATTRIBUTE_HIDDEN) continue ;
             if(Data.cFileName&&Data.cFileName[0]!='.') {
                 dirs.push_back(Data.cFileName) ;
                 n++;
@@ -661,6 +663,7 @@ bool CMainDaemon::LaunchSpinel()
               if(pAborted&&*pAborted) break ;
               if(Data.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY) continue ;
               if(Data.dwFileAttributes&FILE_ATTRIBUTE_READONLY) continue ;
+              if(Data.dwFileAttributes&FILE_ATTRIBUTE_HIDDEN) continue ;
               logdata ldata(Data,tag,relPath) ;
               LogSet.insert(ldata);
               LogBytes += ldata.fsize ;
@@ -980,7 +983,7 @@ void CMainDaemon::WMEndSession(WPARAM wParam, LPARAM lParam)
 {
   if(wParam) {
     EndSession=true;
-	LogOut("<Windowsの終了を検知しました>");
+    LogOut("<Windowsの終了を検知しました>");
     if(SpinelProcess)
       EnumWindows(CloseWindowProc, (LPARAM)GetProcessId(SpinelProcess));
     Finalize();
