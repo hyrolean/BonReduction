@@ -132,7 +132,7 @@ CMainDaemon::CMainDaemon()
   : HInstance(NULL), HWMain(NULL), first(true), niEntried(false),
     StartTimer(NULL), ResumeTimer(NULL), JobTimer(NULL)
 {
-  Suspended = Resumed = EndSession = JobAborted = false ;
+  Suspended = Resumed = EndSession = Finalized = JobAborted = false ;
   JobThread = INVALID_HANDLE_VALUE ;
 }
 //---------------------------------------------------------------------------
@@ -164,17 +164,19 @@ void CMainDaemon::Initialize(HINSTANCE InstanceHandle, HWND MainWindowHandle)
 //---------------------------------------------------------------------------
 void CMainDaemon::Finalize()
 {
-  TerminateJob() ;
-  DeleteTaskIcon();
-  if(JobTimer) { delete JobTimer ; JobTimer = NULL ; }
-  if(ResumeTimer) { delete ResumeTimer ; ResumeTimer = NULL ; }
-  if(StartTimer) { delete StartTimer ; StartTimer = NULL ; }
-  if(SpinelProcess) {
-    CloseHandle(SpinelProcess);
-    SpinelProcess=NULL;
+  if(!Finalized) {
+    Finalized=true;
+    TerminateJob() ;
+    DeleteTaskIcon();
+    if(JobTimer) { delete JobTimer ; JobTimer = NULL ; }
+    if(ResumeTimer) { delete ResumeTimer ; ResumeTimer = NULL ; }
+    if(StartTimer) { delete StartTimer ; StartTimer = NULL ; }
+    if(SpinelProcess) {
+      CloseHandle(SpinelProcess);
+      SpinelProcess=NULL;
+    }
+    LogOut("<<" SPINELRD_VER " Exit>>\n");
   }
-
-  LogOut("<<" SPINELRD_VER " Exit>>\n");
 }
 //---------------------------------------------------------------------------
 string CMainDaemon::AppExeName()
@@ -658,6 +660,7 @@ bool CMainDaemon::LaunchSpinel()
           do {
               if(pAborted&&*pAborted) break ;
               if(Data.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY) continue ;
+              if(Data.dwFileAttributes&FILE_ATTRIBUTE_READONLY) continue ;
               logdata ldata(Data,tag,relPath) ;
               LogSet.insert(ldata);
               LogBytes += ldata.fsize ;
@@ -960,12 +963,28 @@ void CMainDaemon::WMPowerBroadCast(WPARAM wParam, LPARAM lParam)
       break ;
   }
 }
+
 //---------------------------------------------------------------------------
+
+  BOOL CALLBACK CloseWindowProc(HWND hWnd, LPARAM lParam)
+  {
+    DWORD dwProcId = (DWORD)lParam;
+    DWORD dwHwndId = ~dwProcId;
+    GetWindowThreadProcessId(hWnd, &dwHwndId);
+    if(dwProcId==dwHwndId)
+      PostMessage(hWnd, WM_CLOSE, 0, 0);
+    return TRUE;
+  }
+
 void CMainDaemon::WMEndSession(WPARAM wParam, LPARAM lParam)
 {
-  EndSession = wParam ? true : false ;
-  if(EndSession)
-    DeleteTaskIcon() ;
+  if(wParam) {
+    EndSession=true;
+	LogOut("<Windowsの終了を検知しました>");
+    if(SpinelProcess)
+      EnumWindows(CloseWindowProc, (LPARAM)GetProcessId(SpinelProcess));
+    Finalize();
+  }
 }
 //---------------------------------------------------------------------------
 void CMainDaemon::WMUserTaskbar(WPARAM wParam, LPARAM lParam)
@@ -1013,18 +1032,16 @@ void CMainDaemon::OnResumeTimer()
       }
     }else {
       // 死活監視
-      if(SpinelDeathResume) {
-        if(!EndSession) {
-          if(SpinelProcess) {
-            if(WaitForInputIdle(SpinelProcess,ResumeTimer->Interval())) {
-              LogOut("監視対象プロセスの死活を検知しました。強制終了します。",ResumeTimer->Interval());
-              TerminateProcess(SpinelProcess,-9);
-              CloseHandle(SpinelProcess);
-              SpinelProcess=NULL;
-            }
+      if(SpinelDeathResume&&!EndSession) {
+        if(SpinelProcess) {
+          if(WaitForInputIdle(SpinelProcess,ResumeTimer->Interval())) {
+            LogOut("監視対象プロセスの死活を検知しました。強制終了します。",ResumeTimer->Interval());
+            TerminateProcess(SpinelProcess,-9);
+            CloseHandle(SpinelProcess);
+            SpinelProcess=NULL;
           }
-          LaunchSpinel() ;
         }
+        LaunchSpinel() ;
       }
     }
   }
@@ -1034,7 +1051,7 @@ void CMainDaemon::OnJobTimer()
 {
   // ローテーション(DAEMONRotationInterval分に1回)
   LoadIni() ;
-  if(DAEMONJobPause) return ;
+  if(DAEMONJobPause) return;
   if(TerminateJob(true)) {
     TRotations rotations;
     copy(UserRotations.begin(),UserRotations.end(),back_inserter(rotations));
@@ -1050,6 +1067,7 @@ void CMainDaemon::OnJobTimer()
 //---------------------------------------------------------------------------
 void CMainDaemon::DaemonTimerEventMain(CDaemonTimer *Timer)
 {
+  if(Finalized) return;
   if(Timer==StartTimer) OnStartTimer();
   else if(Timer==ResumeTimer) OnResumeTimer();
   else if(Timer==JobTimer) OnJobTimer();

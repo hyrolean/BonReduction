@@ -82,7 +82,7 @@ private:
   std::string AppExeName();
   exclusive_object exclLog;
 protected:
-  bool Suspended, Resumed, EndSession, JobAborted ;
+  bool Suspended, Resumed, EndSession, Finalized, JobAborted ;
   BOOL DAEMONShowTaskIcon ;
   BOOL DAEMONLogEnabled ;
   BOOL DAEMONJobPause ;
