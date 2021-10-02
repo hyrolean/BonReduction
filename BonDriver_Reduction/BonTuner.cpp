@@ -17,6 +17,8 @@
 #include "Resource.h"
 #include "BonTuner.h"
 //---------------------------------------------------------------------------
+// TODO: ハイレゾタイマー対応
+//---------------------------------------------------------------------------
 #pragma comment(lib, "WSock32.Lib")
 #pragma comment(lib, "WinMM.lib")
 
@@ -719,22 +721,22 @@ BOOL CBonTuner::ReloadTunerModule(size_t tuner, bool forceReload)
   if(Tuners[tuner].Module) {
     CREATEBONDRIVER CreateBonDriver_
       = (CREATEBONDRIVER) GetProcAddress(Tuners[tuner].Module,"CreateBonDriver") ;
-	if(CreateBonDriver_) {
-		IBonDriver *BonDriver1 = NULL ;
-		try {
-			BonDriver1 = CreateBonDriver_() ;
-			try {
-				Tuners[tuner].Tuner = dynamic_cast<IBonDriver2*>(BonDriver1) ;
-			} catch(bad_cast &e) {
-				ERROUT("IBonDriver2 bad cast: %s\n",e.what());
-				throw e;
-			}
-		} catch(...) {
-			ERROUT("IBonDriver instance creation failed.\n");
-			if(BonDriver1) BonDriver1->Release();
-			Tuners[tuner].Tuner = NULL;
-		}
-	}
+    if(CreateBonDriver_) {
+        IBonDriver *BonDriver1 = NULL ;
+        try {
+            BonDriver1 = CreateBonDriver_() ;
+            try {
+                Tuners[tuner].Tuner = dynamic_cast<IBonDriver2*>(BonDriver1) ;
+            } catch(bad_cast &e) {
+                ERROUT("IBonDriver2 bad cast: %s\n",e.what());
+                throw e;
+            }
+        } catch(...) {
+            ERROUT("IBonDriver instance creation failed.\n");
+            if(BonDriver1) BonDriver1->Release();
+            Tuners[tuner].Tuner = NULL;
+        }
+    }
   }
   return Tuners[tuner].Tuner!=NULL ? TRUE : FALSE ;
 }
@@ -1325,11 +1327,21 @@ const DWORD CBonTuner::WaitTsStream(const DWORD dwTimeOut)
       {
         exclusive_lock alock(&AsyncTSExclusive) ;
         if(AsyncTSFifo) {
-          if(!AsyncTSFifo->Empty())
+          if((DWORD)AsyncTSFifo->Size()-AsyncTSQueueCurStart>0)
               return WAIT_OBJECT_0 ;
         }
       }
-      return AsyncTSRecvEvent->wait(dwTimeOut) ; ;
+      DWORD s = Elapsed() , elap = 0 ;
+      do {
+        DWORD r=AsyncTSRecvEvent->wait(dwTimeOut-elap) ;
+        if(r==WAIT_OBJECT_0) {
+          exclusive_lock alock(&AsyncTSExclusive) ;
+          if((DWORD)AsyncTSFifo->Size()-AsyncTSQueueCurStart>0)
+              return WAIT_OBJECT_0 ;
+        }else return r ;
+        elap = Elapsed(s);
+      }while(elap<dwTimeOut);
+      return WAIT_TIMEOUT;
     }else {
       exclusive_lock lock(&Exclusive) ;
       if(CurRTuner<Tuners.size()) {
@@ -1403,6 +1415,9 @@ const BOOL CBonTuner::GetTsStream(BYTE *pDst, DWORD *pdwSize, DWORD *pdwRemain)
           }
         }
       }
+      alock.unlock();
+      if(!Result)
+        Sleep(1); // ペナルティ
     }else {
       exclusive_lock lock(&Exclusive) ;
       if(CurRTuner<Tuners.size()) {
@@ -1447,6 +1462,9 @@ const BOOL CBonTuner::GetTsStream(BYTE **ppDst, DWORD *pdwSize, DWORD *pdwRemain
           }
         }
       }
+      alock.unlock();
+      if(!Result)
+        Sleep(1); // ペナルティ
     }
     else {
         exclusive_lock lock(&Exclusive);
@@ -1491,6 +1509,7 @@ void CBonTuner::DoDropStream()
           DWORD dwSize = 0, dwRemain = 0;
           if (!Tuners[CurRTuner].Tuner->GetTsStream(&pDst, &dwSize, &dwRemain))
             break;
+          if(!dwRemain) break;
         }
       }
     }
@@ -1616,6 +1635,7 @@ unsigned int CBonTuner::AsyncTSRecvThreadProcMain()
         }
       }while(r&&dwSize&&dwRemain) ;
       if(n) {
+        exclusive_lock alock(&AsyncTSExclusive) ;
         if(AsyncTSFifo->Size()>AsyncTSQueueCurStart)
           AsyncTSRecvEvent->set() ;
       }
