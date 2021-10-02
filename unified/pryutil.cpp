@@ -6,6 +6,7 @@
 #include <locale.h>
 #include <Shlwapi.h>
 #pragma comment(lib, "Shlwapi.lib")
+#pragma comment(lib, "Rpcrt4.lib")
 
 #include "pryutil.h"
 //---------------------------------------------------------------------------
@@ -128,6 +129,17 @@ string lower_case(string str)
   CopyMemory(temp.data(),str.c_str(),(str.length()+1)*sizeof(char)) ;
   _strlwr_s(temp.data(),str.length()+1) ;
   return static_cast<string>(temp.data()) ;
+}
+//---------------------------------------------------------------------------
+string uuid_string()
+{
+  UUID uuid_ ;
+  UuidCreate(&uuid_) ;
+  unsigned char * result ;
+  UuidToStringA(&uuid_,&result) ;
+  string str_result = (char*)result ;
+  RpcStringFreeA(&result);
+  return lower_case(str_result) ;
 }
 //---------------------------------------------------------------------------
 string str_printf(const char *format, ...)
@@ -629,8 +641,13 @@ static int event_create_count = 0 ;
 //---------------------------------------------------------------------------
 event_object::event_object(BOOL initialState_,wstring name_,BOOL security_)
 {
-  if(name_.empty()) name_ = L"Local\\event"+itows(event_create_count++) ;
+#ifdef _DEBUG
+  id = event_create_count;
+#endif
+  if(name_.empty()) name_ = L"Local\\event"+itows(event_create_count)+L"_"+mbcs2wcs(uuid_string()) ;
+
   name = name_ ;
+  event_create_count++;
 
   SECURITY_ATTRIBUTES sa,*psa=NULL;
   SECURITY_DESCRIPTOR sd;
@@ -647,25 +664,28 @@ event_object::event_object(BOOL initialState_,wstring name_,BOOL security_)
     }
   }
 
-  event = CreateEvent(psa,FALSE,initialState_,name.c_str()) ;
+  event = CreateEvent(psa,FALSE,initialState_,name.empty()?NULL:name.c_str()) ;
 #ifdef _DEBUG
   if(is_valid()) {
-    TRACE(L"event_object created. [name=%s]\r\n",name.c_str()) ;
+    TRACE(L"event_object(%d) created. [name=%s]\r\n",id,name.empty()?L"<EMPTY>":name.c_str()) ;
   }else {
-    TRACE(L"event_object failed to create. [name=%s]\r\n",name.c_str()) ;
+    TRACE(L"event_object(%d) failed to create. [name=%s]\r\n",id,name.empty()?L"<EMPTY>":name.c_str()) ;
   }
 #endif
 }
 //---------------------------------------------------------------------------
 event_object::event_object(const event_object &clone_source)
 {
+#ifdef _DEBUG
+  id = event_create_count++;
+#endif
   name = clone_source.name ;
   event = clone_source.open() ;
 #ifdef _DEBUG
   if(is_valid()) {
-    TRACE(L"event_object cloned. [name=%s]\r\n",name.c_str()) ;
+    TRACE(L"event_object(%d) cloned. [name=%s]\r\n",id,name.empty()?L"<EMPTY>":name.c_str()) ;
   }else {
-    TRACE(L"event_object failed to clone. [name=%s]\r\n",name.c_str()) ;
+    TRACE(L"event_object(%d) failed to clone. [name=%s]\r\n",id,name.empty()?L"<EMPTY>":name.c_str()) ;
   }
 #endif
 }
@@ -674,9 +694,9 @@ event_object::~event_object()
 {
 #ifdef _DEBUG
   if(is_valid()) {
-    TRACE(L"event_object finished. [name=%s]\r\n",name.c_str()) ;
+    TRACE(L"event_object(%d) disposed. [name=%s]\r\n",id,name.c_str()) ;
   }else {
-    TRACE(L"event_object finished. (failure) [name=%s]\r\n",name.c_str()) ;
+    TRACE(L"event_object(%d) disposed. (failure) [name=%s]\r\n",id,name.c_str()) ;
   }
 #endif
   if(is_valid()) CloseHandle(event) ;
