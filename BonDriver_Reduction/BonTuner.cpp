@@ -1221,8 +1221,10 @@ const BOOL CBonTuner::OpenTuner(void)
     }
   }
   if(HRTimerEnabled) {
-    HRTimerHandle = CreateWaitableTimerEx(NULL, NULL,
-      CREATE_WAITABLE_TIMER_HIGH_RESOLUTION , TIMER_ALL_ACCESS);
+    if(HRTimerHandle==NULL) {
+      HRTimerHandle = CreateWaitableTimerEx(NULL, NULL,
+        CREATE_WAITABLE_TIMER_HIGH_RESOLUTION , TIMER_ALL_ACCESS);
+    }
   }
   DoFullScan();
   AsyncTSBegin() ;
@@ -1244,11 +1246,9 @@ void CBonTuner::CloseTuner(void)
       Tuners[tuner].Free() ;
     }
   }
-  if(MMTimerEnabled) {
-    if(MMTimerCurEnabled) {
-      timeEndPeriod(MMTimerPeriod);
-      MMTimerCurEnabled=false;
-    }
+  if(MMTimerCurEnabled) {
+    timeEndPeriod(MMTimerPeriod);
+    MMTimerCurEnabled=false;
   }
   if(HRTimerHandle!=NULL) {
     CloseHandle(HRTimerHandle);
