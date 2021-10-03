@@ -50,7 +50,7 @@ typedef std::map<int,CDaemonTimer*> MAP_DaemonTimer ;
     int MaxDays;
     __int64 MaxBytes;
     bool SubDirectories;
-    masks_t FellowMasks ;
+    masks_t FellowSuffixes ;
     TRotationItem(std::string FileMasks_,int MaxFiles_,int MaxDays_,
       __int64 MaxBytes_,bool SubDirectories_=false,std::string FellowSuffix_="^")
       : MaxFiles(MaxFiles_),MaxDays(MaxDays_),
@@ -61,7 +61,7 @@ typedef std::map<int,CDaemonTimer*> MAP_DaemonTimer ;
         split(Masks,MaskCSV,',');
       }
       if(FellowSuffix_!="^") {
-        split(FellowMasks,FellowSuffix_,',');
+        split(FellowSuffixes,FellowSuffix_,',');
       }
     }
   };

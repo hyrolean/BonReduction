@@ -154,6 +154,8 @@ protected:
   BOOL MMTimerEnabled;
   UINT MMTimerPeriod;
   bool MMTimerCurEnabled;
+  BOOL HRTimerEnabled;
+  HANDLE HRTimerHandle;
 
 protected:
   std::string MakeModuleFileName() ;

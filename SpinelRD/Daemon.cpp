@@ -19,9 +19,36 @@ using namespace std;
 //===========================================================================
 // Functions
 //---------------------------------------------------------------------------
+static string unc_root_of(string filename)
+{
+  string root = file_drive_of(filename);
+  if(root.empty()) {
+    wstring wfname = mbcs2wcs(filename) ;
+    if(wfname.length()>=2) {
+      if(wfname[0]==L'\\'&&wfname[1]==L'\\') do {
+        size_t i;
+        for(i=2;i<wfname.length()&&wfname[i]==L'\\';i++);
+        if(i>=wfname.length()) break;
+        for(;i<wfname.length();i++) {
+          if(wfname[i]==L'\\') break;
+        }
+        for(i++;i<wfname.length()&&wfname[i]==L'\\';i++);
+        if(i>=wfname.length()) break;
+        size_t j=i;
+        for(;i<wfname.length();i++) {
+          if(wfname[i]==L'\\') break;
+        }
+        if(i==j) break;
+        root = wcs2mbcs(wfname.substr(0,i)) ; // \\server\place
+      }while(0);
+    }
+  }
+  return root;
+}
+//---------------------------------------------------------------------------
 static __int64 GetDiskFreeSpaceFromFileName(string FileName)
 {
-  string Drive = file_drive_of(FileName);
+  string Drive = unc_root_of(FileName);
 
   DWORD SectorsPerCluster;
   DWORD BytesPerSector;
@@ -369,32 +396,76 @@ void CMainDaemon::LoadIni()
       LOADSTR(FileMask) ;
       if(FileMask!="") {
         LogOut("\tファイルマスク:\t%s", FileMask.c_str());
-        BOOL Enabled=TRUE ;
-        int MaxFiles=INT_MAX, MaxDays=INT_MAX ;
-        __int64 MaxBytes=DEFMAXBYTES ;
-        BOOL SubDirectories=0 ;
-        string FellowSuffix="^";
-        LOADINT(Enabled);
-        LogOut("\tローテーション機能:\t%s", Enabled?"有効":"無効(スキップします。)");
-        if(!Enabled) continue ;
-        LOADINT(MaxFiles);
+        // 登録
+        {
+          BOOL Enabled=TRUE ;
+          int MaxFiles=INT_MAX, MaxDays=INT_MAX ;
+          __int64 MaxBytes=DEFMAXBYTES ;
+          BOOL SubDirectories=0 ;
+          string FellowSuffix="^";
+          LOADINT(Enabled);
+          LogOut("\tローテーション機能:\t%s", Enabled?"有効":"無効(※スキップします。)");
+          if(!Enabled) continue ;
+          LOADINT(MaxFiles);
+          LOADINT(MaxDays);
+          LOADINT64(MaxBytes);
+          LOADINT(SubDirectories);
+          LOADSTR(FellowSuffix) ;
+          rotations.push_back(
+            TRotationItem(FileMask,MaxFiles,MaxDays,MaxBytes,!!SubDirectories,FellowSuffix));
+        }
+        // 登録内容の検証
+        TRotationItem &item = rotations.back();
+        string drv = unc_root_of(item.FilePath);
+        string drv_desc = "ディスクドライブ("+(drv.empty()?string("<不明>"):drv)+")";
+        LogOut("\tパス:");
+        if(item.FilePath=="")
+            LogOut("\t\t<不明(※パスを指定してください。)>");
+        else if(!folder_is_existed(item.FilePath))
+            LogOut("\t\t%s<※このパスは存在しません。パスが不正である可能性があります。>",item.FilePath.c_str());
+        else
+            LogOut("\t\t%s",item.FilePath.c_str());
+        LogOut("\tマスク:");
+        if(item.Masks.empty())
+          LogOut("\t\t<不明(※ワイルドカードを使って記述してください。)>");
+        else {
+          for(size_t i=0;i<item.Masks.size();i++) {
+            LogOut("\t\t%s",item.Masks[i].c_str());
+          }
+        }
+        LogOut("\t連動削除サフィックス:");
+        if(item.FellowSuffixes.empty())
+          LogOut("\t\t<なし>");
+        else {
+          for(size_t i=0;i<item.FellowSuffixes.size();i++) {
+            LogOut("\t\t%s",item.FellowSuffixes[i].c_str());
+          }
+        }
+        LogOut("\tサブディレクトリ再入:\t%s", item.SubDirectories?"有効":"無効");
         LogOut("\t最大ファイル数:\t%s", (
-            MaxFiles==INT_MAX?string("制限ナシ"):
-            str_printf("%d",MaxFiles)).c_str() );
-        LOADINT(MaxDays);
+            item.MaxFiles==INT_MAX?string("制限ナシ"):
+            str_printf("%d",item.MaxFiles)).c_str() );
         LogOut("\t最大保持日数:\t%s", (
-            MaxDays==INT_MAX?string("制限ナシ"):
-            str_printf("%d日間",MaxDays)).c_str() );
-        LOADINT64(MaxBytes);
-        LogOut("\t最大バイト数:\t%s", (
-            MaxBytes==DEFMAXBYTES?string("制限ナシ"):
-            IntToKMGT(MaxBytes)).c_str() );
-        LOADINT(SubDirectories);
-        LogOut("\tサブディレクトリ:\t%s", SubDirectories?"有効":"無効");
-        LOADSTR(FellowSuffix) ;
-        rotations.push_back(
-          TRotationItem(FileMask,MaxFiles,MaxDays,MaxBytes,!!SubDirectories,FellowSuffix));
-        LogOut("\t連動削除サフィックス:\t%s", FellowSuffix=="^"?"<なし>":FellowSuffix.c_str());
+            item.MaxDays==INT_MAX?string("制限ナシ"):
+            str_printf("%d日間",item.MaxDays)).c_str() );
+        LogOut("\t最大バイト数:\t%s%s", (
+            item.MaxBytes==DEFMAXBYTES?string("制限ナシ"):
+            (item.MaxBytes<0?drv_desc+"の最大容量":string(""))+IntToKMGT(item.MaxBytes)+"Bytes").c_str(),
+            item.MaxBytes<0?" (※パッシブ式)":"");
+        if(item.MaxBytes<0) {
+          if(drv.empty()) {
+            LogOut("\t\t※ディスクドライブ不明の為、アクティブ式ローテーションへ回される可能性があります。");
+          }else {
+            __int64 free_space = GetDiskFreeSpaceFromFileName(drv);
+            if(free_space<0)
+              LogOut("\t\t※ディスク空き容量不明の為、アクティブ式ローテーションへ回される可能性があります。");
+            else {
+              LogOut(
+                "\t\t※%sの現在の空き容量: %s", drv_desc.c_str(),
+                (IntToKMGT(free_space)+"Bytes").c_str() );
+            }
+          }
+        }
       }
     }
 
@@ -692,13 +763,13 @@ bool CMainDaemon::LaunchSpinel()
 
 static void LogRotateFiles(CMainDaemon *daemon,
     const string &LogPath,const masks_t &Masks,int MaxFiles,int MaxDays,
-    __int64 MaxFileBytes,bool SubDirectories,const masks_t &FellowMasks, bool &Aborted )
+    __int64 MaxFileBytes,bool SubDirectories,const masks_t &FellowSuffixes, bool &Aborted )
 {
   logset LogSet ;
   DWORD maxTime = 0 ;
   __int64 LogBytes= make_logset(LogSet,LogPath,Masks,SubDirectories,&maxTime,&Aborted) ;
 
-  if(!FellowMasks.empty()) {
+  if(!FellowSuffixes.empty()) {
     set<string> done ;
     for(logset::iterator pos=LogSet.begin();pos!=LogSet.end();++pos) {
       if(Aborted) break ;
@@ -710,7 +781,7 @@ static void LogRotateFiles(CMainDaemon *daemon,
       string fpath = lower_case( file_path_of(FileName) ) ;
       string fpathprefix = fpath + lower_case( file_prefix_of(FileName) );
       logset fellow_logset ;
-      make_logset(fellow_logset,fpathprefix,FellowMasks) ;
+      make_logset(fellow_logset,fpathprefix,FellowSuffixes) ;
       for( logset::iterator flpos = fellow_logset.begin() ;
            flpos != fellow_logset.end() ; ++flpos ) {
         string fellow_filename = fpath + lower_case(flpos->fname) ;
@@ -755,7 +826,7 @@ static void LogRotateFiles(CMainDaemon *daemon,
       logset fellow_logset ;
       string fpath = file_path_of(FileName) ;
       string fpathprefix = fpath + file_prefix_of(FileName) ;
-      make_logset(fellow_logset,fpathprefix,FellowMasks) ;
+      make_logset(fellow_logset,fpathprefix,FellowSuffixes) ;
       for( logset::iterator flpos = fellow_logset.begin();
            flpos != fellow_logset.end(); flpos++ ) {
         string fellow_filename = fpath+flpos->fname ;
@@ -784,7 +855,7 @@ void CMainDaemon::JobRotate()
       JobRotations[i].MaxDays,
       JobRotations[i].MaxBytes,
       JobRotations[i].SubDirectories,
-      JobRotations[i].FellowMasks,JobAborted ) ;
+      JobRotations[i].FellowSuffixes,JobAborted ) ;
     if(JobAborted) return ;
   }
 
@@ -806,7 +877,7 @@ void CMainDaemon::JobRotate()
     // ディスク空き容量計測
     for(;i<JobRotations.size();i++) {
       if(JobAborted) return ;
-      string drv = lower_case(file_drive_of(JobRotations[i].FilePath)) ;
+      string drv = lower_case(unc_root_of(JobRotations[i].FilePath)) ;
       if(spaces.find(drv)==spaces.end()) {
         __int64 space = GetDiskFreeSpaceFromFileName(drv) ;
         if(space<0) { // 空き容量不明の為、Active に回して放棄
@@ -817,7 +888,7 @@ void CMainDaemon::JobRotate()
             JobRotations[i].MaxDays,
             JobRotations[i].MaxBytes,
             JobRotations[i].SubDirectories,
-            JobRotations[i].FellowMasks, JobAborted) ;
+            JobRotations[i].FellowSuffixes, JobAborted) ;
           continue ;
         }
         spaces[drv]=space ;
@@ -871,11 +942,11 @@ void CMainDaemon::JobRotate()
         if(existed)
             LogOut("- ファイル \"%s\" を削除しました。",FileName.c_str());
         __int64 bytes = existed ? pos->fsize : 0 ; LogFiles-- ;
-        const masks_t &FellowMasks= JobRotations[ji].FellowMasks ;
+        const masks_t &FellowSuffixes= JobRotations[ji].FellowSuffixes ;
         logset fellow_logset ;
         string fpath = file_path_of(FileName) ;
         string fpathprefix = fpath + file_prefix_of(FileName);
-        make_logset(fellow_logset,fpathprefix,FellowMasks) ;
+        make_logset(fellow_logset,fpathprefix,FellowSuffixes) ;
         for( logset::iterator flpos = fellow_logset.begin();
              flpos != fellow_logset.end(); flpos++ ) {
           string fellow_filename = fpath+flpos->fname ;
@@ -940,27 +1011,36 @@ bool CMainDaemon::TerminateJob(bool checkOnly)
 //---------------------------------------------------------------------------
 void CMainDaemon::WMPowerBroadCast(WPARAM wParam, LPARAM lParam)
 {
+  string reason="";
   switch(wParam) {
     case PBT_APMQUERYSTANDBY:
+      reason="QUERYSTANDBY";
     case PBT_APMQUERYSUSPEND: //システムがサスペンドを要求してきた
-      LogOut("<システムがサスペンドを要求しています>");
+      if(reason.empty()) reason="QUERYSUSPEND";
+      LogOut("<システムがサスペンドを要求しています> [%s]",reason.c_str());
       JobTimer->SetEnabled(false) ;
       TerminateJob() ;
       break ;
     case PBT_APMSTANDBY:
+      reason="STANDBY";
     case PBT_APMSUSPEND:
+      if(reason.empty()) reason="SUSPEND";
       Suspended = true ;
-      LogOut("<システムがサスペンドに移行しました>");
+      LogOut("<システムがサスペンドに移行しました> [%s]",reason.c_str());
       ResumeTimer->SetEnabled(false) ;
       JobTimer->SetEnabled(false) ;
       TerminateJob() ;
       break ;
     case PBT_APMRESUMESUSPEND:      // 何らかの理由でシステムが復帰した
+      reason="RESUMESUSPEND";
     case PBT_APMRESUMECRITICAL:     // システムが致命的な状態から復帰した
+      if(reason.empty()) reason="RESUMECRITICAL";
     case PBT_APMRESUMEAUTOMATIC:    // システムが自動的に復帰した
+      if(reason.empty()) reason="RESUMEAUTOMATIC";
     case PBT_APMQUERYSUSPENDFAILED: // システムがサスペンドしようしたが失敗した
+      if(reason.empty()) reason="SUSPENDFAILED";
       Suspended = false ;
-      LogOut("<システムがサスペンドから復帰しました>");
+      LogOut("<システムがサスペンドから復帰しました> [%s]",reason.c_str());
       Resumed = true ;
       StartTimer->SetEnabled(true) ;
       break ;

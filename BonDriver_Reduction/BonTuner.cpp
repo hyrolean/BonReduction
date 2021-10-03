@@ -17,10 +17,11 @@
 #include "Resource.h"
 #include "BonTuner.h"
 //---------------------------------------------------------------------------
-// TODO: ハイレゾタイマー対応
-//---------------------------------------------------------------------------
 #pragma comment(lib, "WSock32.Lib")
 #pragma comment(lib, "WinMM.lib")
+#ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
+#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
+#endif
 
 using namespace std ;
 
@@ -318,6 +319,8 @@ CBonTuner::CBonTuner()
   MMTimerEnabled=FALSE;
   MMTimerPeriod=10;
   MMTimerCurEnabled=false;
+  HRTimerEnabled=FALSE;
+  HRTimerHandle=NULL;
 }
 //-----
 CBonTuner::~CBonTuner()
@@ -480,6 +483,8 @@ void CBonTuner::LoadIni()
     //マルチメディアタイマー
     LOADINT(MMTimerEnabled) ;
     LOADINT(MMTimerPeriod) ;
+    //ハイレゾタイマー
+    LOADINT(HRTimerEnabled) ;
   }
 
   if(SaveCurrent) {
@@ -1215,6 +1220,10 @@ const BOOL CBonTuner::OpenTuner(void)
       MMTimerCurEnabled=true;
     }
   }
+  if(HRTimerEnabled) {
+    HRTimerHandle = CreateWaitableTimerEx(NULL, NULL,
+      CREATE_WAITABLE_TIMER_HIGH_RESOLUTION , TIMER_ALL_ACCESS);
+  }
   DoFullScan();
   AsyncTSBegin() ;
   DBGOUT("Tuner Opened.\r\n");
@@ -1240,6 +1249,10 @@ void CBonTuner::CloseTuner(void)
       timeEndPeriod(MMTimerPeriod);
       MMTimerCurEnabled=false;
     }
+  }
+  if(HRTimerHandle!=NULL) {
+    CloseHandle(HRTimerHandle);
+    HRTimerHandle=NULL;
   }
   DBGOUT("Tuner Closed.\r\n");
 }

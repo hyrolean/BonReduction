@@ -141,8 +141,9 @@ BonDriver_RDCT ( BonDriver_Reduction )
 
 ## ■更新履歴
 
-- version 1.5 rev.6
+- version 1.5 rev.7
 
+  - 割込みタイマーの精度を高める項目 HRTimerEnabled をiniに追加[rev.7]
   - IBonDriver2 インスタンス変換時に dynamic_cast を使用する仕様に変更[rev.6]
   - ミューテックスの分類項目 TunerMutexAvoidPrefix をiniに追加[rev.5++(rev.2)]
   - ミューテックスの使用だけを把握する項目 AvoidTunerMutex をiniに追加[rev.5++]
