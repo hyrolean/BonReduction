@@ -1,5 +1,7 @@
 //===========================================================================
 #include "stdafx.h"
+
+#include <atlcomtime.h>
 #include <tlhelp32.h>
 #include <shellApi.h>
 #include <subauth.h>
@@ -143,6 +145,7 @@ CMainDaemon MainDaemon;
 #define DEFDAEMONLOGENABLED       0
 #define DEFDAEMONJOBINTERVAL      60
 #define DEFDAEMONTHREADPRIORITY   THREAD_PRIORITY_LOWEST
+#define DEFDAEMONJOBRESUMEWAIT    1000
 #define DEFSPINELENABLED          1
 #define DEFSPINELEXENAME          "Spinel.exe"
 #define DEFSPINELEXEPARAM         "-WindowState=Minimized"
@@ -264,12 +267,14 @@ void CMainDaemon::LoadIni()
     }while(0)
 
     int DAEMONJobInterval = JobTimer->Interval()/(60*1000) ;
+    int DAEMONJobResumeWait = DEFDAEMONJOBRESUMEWAIT ;
     int SpinelResumeDelay = ResumeTimer->Interval() ;
 
     LOADINT_SEC(DAEMON,ShowTaskIcon) ;
     LOADINT_SEC(DAEMON,LogEnabled) ;
     LOADINT_SEC(DAEMON,JobPause) ;
     LOADINT_SEC(DAEMON,JobInterval) ;
+    LOADINT_SEC(DAEMON,JobResumeWait) ;
     LOADINT_SEC(DAEMON,ThreadPriority) ;
 
     if(first)
@@ -300,6 +305,11 @@ void CMainDaemon::LoadIni()
         StrThPrior = "リアルタイム" ; break;
     }
     LogOut("\tジョブスレッドの優先度:\t%s(%d)", StrThPrior.c_str(), DAEMONThreadPriority);
+    if(DAEMONJobResumeWait>0) {
+      LogOut("\tスタンバイ復帰時のジョブ再開待機時間:\t%d msec", DAEMONJobResumeWait);
+      StartTimer->SetInterval(DAEMONJobResumeWait);
+    }else
+      StartTimer->SetInterval(1);
 
     LOADINT_SEC(Spinel,Enabled) ;
     LOADSTR_SEC(Spinel,ExeName) ;
@@ -416,13 +426,13 @@ void CMainDaemon::LoadIni()
         }
         // 登録内容の検証
         TRotationItem &item = rotations.back();
-        string drv = unc_root_of(item.FilePath);
+        string drv = upper_case(unc_root_of(item.FilePath));
         string drv_desc = "ディスクドライブ("+(drv.empty()?string("<不明>"):drv)+")";
         LogOut("\tパス:");
         if(item.FilePath=="")
             LogOut("\t\t<不明(※パスを指定してください。)>");
         else if(!folder_is_existed(item.FilePath))
-            LogOut("\t\t%s<※このパスは存在しません。パスが不正である可能性があります。>",item.FilePath.c_str());
+            LogOut("\t\t%s <※このパスは存在しません。パスが不正である可能性があります。>",item.FilePath.c_str());
         else
             LogOut("\t\t%s",item.FilePath.c_str());
         LogOut("\tマスク:");
@@ -673,16 +683,22 @@ bool CMainDaemon::LaunchSpinel()
 
   struct logdata {
     string fname ;
-    DWORD ftime ;
+    double ftime ;
     __int64 fsize ;
     int tag ;
     logdata(const WIN32_FIND_DATAA &find_data, int tag_=-1,const string &relPath="") : tag(tag_) {
       FILETIME local ;
-      WORD d=0, t=0 ;
       fname = relPath + string(find_data.cFileName) ;
       FileTimeToLocalFileTime(&find_data.ftLastWriteTime, &local);
+
+      #if 1
+      ftime = COleDateTimeSpan(COleDateTime(local)).GetTotalDays() ;
+      #else
+      WORD d=0, t=0 ;
       FileTimeToDosDateTime(&local, &d, &t);
-      ftime = DWORD(d)<<16|DWORD(t) ;
+      ftime = double(d) + double(t)/65536.0 ;
+      #endif
+
       fsize = __int64(find_data.nFileSizeHigh)<<32 | __int64(find_data.nFileSizeLow) ;
     }
   };
@@ -719,12 +735,12 @@ bool CMainDaemon::LaunchSpinel()
 
   static __int64 make_logset(logset &LogSet,
       const string &FilePath,const masks_t &Masks,bool SubDirec=false,
-      DWORD *pMaxTime=NULL,bool *pAborted=NULL, int tag=-1,const string &relPath="") {
+      double *pMaxTime=NULL,bool *pAborted=NULL, int tag=-1,const string &relPath="") {
 
     WIN32_FIND_DATAA Data ;
 
     __int64 LogBytes=0 ;
-    DWORD maxTime = 0 ;
+    double maxTime = 0 ;
 
     for(size_t i=0;i<Masks.size();i++) {
       string LogPathMask = FilePath+relPath+Masks[i] ;
@@ -749,7 +765,7 @@ bool CMainDaemon::LaunchSpinel()
       if(enum_dirs(dirs,FilePath+relPath,pAborted)>0) {
         for(size_t i=0;i<dirs.size();i++) {
           if(pAborted&&*pAborted) break ;
-          DWORD subMaxTime=0;
+          double subMaxTime=0;
           LogBytes+=make_logset(
             LogSet,FilePath,Masks,true,&subMaxTime,pAborted,tag,relPath+dirs[i]+"\\");
           if(subMaxTime>maxTime) maxTime = subMaxTime ;
@@ -766,7 +782,7 @@ static void LogRotateFiles(CMainDaemon *daemon,
     __int64 MaxFileBytes,bool SubDirectories,const masks_t &FellowSuffixes, bool &Aborted )
 {
   logset LogSet ;
-  DWORD maxTime = 0 ;
+  double maxTime = 0 ;
   __int64 LogBytes= make_logset(LogSet,LogPath,Masks,SubDirectories,&maxTime,&Aborted) ;
 
   if(!FellowSuffixes.empty()) {
@@ -798,7 +814,7 @@ static void LogRotateFiles(CMainDaemon *daemon,
   __int64 BorderBytes ;
   if(MaxFileBytes>0) BorderBytes = MaxFileBytes ;
   else {
-    __int64 FreeSpace = GetDiskFreeSpaceFromFileName(LogPath) ;
+    __int64 FreeSpace = GetDiskFreeSpaceFromFileName(unc_root_of(LogPath)) ;
     __int64 NeedSpace = -MaxFileBytes ;
     if(FreeSpace>=0&&NeedSpace>FreeSpace) {
       __int64 Space = NeedSpace-FreeSpace ;
@@ -808,10 +824,9 @@ static void LogRotateFiles(CMainDaemon *daemon,
     }
   }
 
-  DWORD BorderTime ;
-  DWORD maxDays = DWORD(MaxDays)<<16 ;
-  if(maxTime<maxDays) BorderTime=0 ;
-  else BorderTime = maxTime - maxDays ;
+  double BorderTime ;
+  if(maxTime<double(MaxDays)) BorderTime=0 ;
+  else BorderTime = maxTime - double(MaxDays) ;
 
   int LogFiles = LogSet.size() ;
   for(logset::iterator pos=LogSet.begin();pos!=LogSet.end();++pos) {
@@ -865,7 +880,7 @@ void CMainDaemon::JobRotate()
 
     struct TStat {
       size_t JRI ; // Index of JobRotations
-      DWORD BorderTime ;
+      double BorderTime ;
       size_t LogFiles ;
       string Drive ;
       TStat(size_t ji, string drv)
@@ -877,7 +892,7 @@ void CMainDaemon::JobRotate()
     // ディスク空き容量計測
     for(;i<JobRotations.size();i++) {
       if(JobAborted) return ;
-      string drv = lower_case(unc_root_of(JobRotations[i].FilePath)) ;
+      string drv = upper_case(unc_root_of(JobRotations[i].FilePath)) ;
       if(spaces.find(drv)==spaces.end()) {
         __int64 space = GetDiskFreeSpaceFromFileName(drv) ;
         if(space<0) { // 空き容量不明の為、Active に回して放棄
@@ -907,7 +922,7 @@ void CMainDaemon::JobRotate()
     for(i=0;i<Stats.size();i++) {
       if(JobAborted) return ;
       int ji = Stats[i].JRI ;
-      DWORD maxTime ;
+      double maxTime ;
       size_t &LogFiles = Stats[i].LogFiles ;
       size_t sz = LogSet.size() ;
       make_logset(LogSet,
@@ -915,7 +930,7 @@ void CMainDaemon::JobRotate()
         JobRotations[ji].Masks,
         JobRotations[ji].SubDirectories,&maxTime,&JobAborted,i) ;
       LogFiles = LogSet.size() - sz ;
-      DWORD maxDays = DWORD(JobRotations[ji].MaxDays)<<16 ;
+      double maxDays = double(JobRotations[ji].MaxDays) ;
       if(maxTime<maxDays) Stats[i].BorderTime=0 ;
       else Stats[i].BorderTime = maxTime - maxDays ;
       busySet.insert(i);
