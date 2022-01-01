@@ -1,76 +1,83 @@
-(���܂�) Spinel Resume DAEMON
+(おまけ) Spinel Resume DAEMON
 
-������
+■説明
 
-   Spinel.exe �̎����Ď���Log�f�B���N�g���̃��[�e�[�V�������قڎ����ōs�����Ƃ�
-  �ړI�Ƃ��� Spinel.exe �̓�����萫�����߂邽�߂̂��܂��\�t�g�B
-   ���ɂ������̔C�ӂ̃f�B���N�g�������[�e�[�V��������@�\�������ځB
-
-
-���g����
-
-   Spinel.exe �Ɠ���f�B���N�g���� SpinelRD.exe �� SpinelRD.ini ��u���āA
-  SpinelRD.exe ���N�����܂��B�ȍ~�A�o�b�N�O���E���h�Ŏ����Ď������ɓ���܂��B
-
-  �� �ڂ����g�����́A�Y�t�� SpinelRD.ini �t�@�C���̒��߂��Q�Ƃ��Ă��������B
-  �� �{�\�t�g�E�F�A�́A�o�b�N�O���E���h�œ��삵�܂��B�I������ꍇ�́A
-    �^�X�N�}�l�[�W������ SpinelRD.exe ��T���ăv���Z�X���I�����Ă��������B
-    �i�^�X�N�g���C�ɃA�C�R����\�����Ă���ꍇ�́A�A�C�R�����N���b�N���ĕ\��
-      ������ʂ���I�����邱�Ƃ��ł��܂��B�j
+   Spinel.exe の死活監視とLogディレクトリのローテーションをほぼ自動で行うことを
+  目的とした Spinel.exe の動作安定性を高めるためのおまけソフト。
+   他にも複数の任意のディレクトリをローテーションする機能をも搭載。
 
 
-���X�V����
+■使い方
+
+   Spinel.exe と同一ディレクトリに SpinelRD.exe と SpinelRD.ini を置いて、
+  SpinelRD.exe を起動します。以降、バックグラウンドで死活監視活動に入ります。
+
+  ※ 詳しい使い方は、添付の SpinelRD.ini ファイルの注釈を参照してください。
+  ※ 本ソフトウェアは、バックグラウンドで動作します。終了する場合は、
+    タスクマネージャから SpinelRD.exe を探してプロセスを終了してください。
+    （タスクトレイにアイコンを表示している場合は、アイコンをクリックして表示
+      される画面から終了することもできます。）
+
+
+■更新履歴
+
+  ver. 1.1i
+
+   ・スタンバイから復帰後にバックグラウンド処理を開始するまでの待機時間を設定
+    できる項目をiniに追加(JobResumeWait)
+   ・ディレクトリローテーションにMaxDays項目を指定した場合に意図した経過日数よ
+    りも早い段階でファイルを削除してしまうことのあるバグを修正
 
   ver. 1.1h
 
-   �E�f�B���N�g�����[�e�[�V�����̃p�b�V�u��(�f�B�X�N�̋󂫗e�ʂɍ��E��������)
-    ��UNC�p�X�̌`��(e.g.\\Server\Place)�ł��@�\����C����ǉ�
+   ・ディレクトリローテーションのパッシブ式(ディスクの空き容量に左右される方式)
+    にUNCパスの形式(e.g.\\Server\Place)でも機能する修正を追加
 
   ver. 1.1g+
 
-   �E�f�B���N�g�����[�e�[�V�������s���t�@�C����񋓂���O�i�K�ŉB���t�@�C����
-    �ǎ��p�t�@�C���͎��O�Ƀ��[�e���V�����̑Ώۂ��珜�O���鏈����ǉ�[g+]
-   �EWindows�I�����Ɍ��ݐi�s���̃W���u���~���鏈����ǉ�
+   ・ディレクトリローテーションを行うファイルを列挙する前段階で隠しファイルと
+    読取専用ファイルは事前にローテンションの対象から除外する処理を追加[g+]
+   ・Windows終了時に現在進行中のジョブを停止する処理を追加
 
   ver. 1.1f
 
-   �ELog�f�B���N�g���Ƀ��O���o�͂ł��鍀�ڂ�ini�ɒǉ�(LogEnabled)
+   ・Logディレクトリにログを出力できる項目をiniに追加(LogEnabled)
 
   ver. 1.1e+
 
-   �E�f�B�X�N�h���C�u�ɏ\���ȋ󂫗e�ʂ����݂���ꍇ�̕s�v�ȃf�B���N�g�����[�e�[
-    �V�����̃W���u�����O�ɔr������H����ǉ�[e+]
-   �E�f�B���N�g�����[�e�[�V�����@�\��FellowSuffix�Ƀ��C���h�J�[�h���L�q�\��
-    �d�l�ɉ���
+   ・ディスクドライブに十分な空き容量が存在する場合の不要なディレクトリローテー
+    ションのジョブを事前に排除する工程を追加[e+]
+   ・ディレクトリローテーション機能のFellowSuffixにワイルドカードを記述可能な
+    仕様に改良
 
   ver. 1.1d+
 
-   �E�f�B���N�g�����[�e�[�V�����@�\�̃t�@�C���T�C�Y�̏W�v���@���ꕔ�ύX[d+]
-   �E���[�U�[�f�B���N�g�����[�e�[�V�����@�\�ɃT�u�f�B���N�g�����܂߂邩�ǂ�����
-    �w�肷�鍀�ڂ�ini�ɒǉ�(SubDirectories)
+   ・ディレクトリローテーション機能のファイルサイズの集計方法を一部変更[d+]
+   ・ユーザーディレクトリローテーション機能にサブディレクトリを含めるかどうかを
+    指定する項目をiniに追加(SubDirectories)
 
   ver. 1.1c
 
-   �E�T�X�y���h�ڍs�O�Ƀo�b�N�O���E���h�i�s���̏��������ׂĒ�~����d�l�ɉ���
+   ・サスペンド移行前にバックグラウンド進行中の処理をすべて停止する仕様に改良
 
   ver. 1.1b
 
-   �E�o�b�N�O���E���h�������ꎞ��~�ł��鍀�ڂ�ini�ɒǉ�(JobPause)
-   �E�o�b�N�O���E���h�����̎��s�Ԋu��ݒ�ł��鍀�ڂ�ini�ɒǉ�(JobInterval)
-   �E�o�b�N�O���E���h�����̗D��x��ݒ�ł��鍀�ڂ�ini�ɒǉ�(ThreadPriority)
-   �ESpinel�v���Z�X�̗D��x��ݒ�ł��鍀�ڂ�ini�ɒǉ�(ProcessPriority)
+   ・バックグラウンド処理を一時停止できる項目をiniに追加(JobPause)
+   ・バックグラウンド処理の実行間隔を設定できる項目をiniに追加(JobInterval)
+   ・バックグラウンド処理の優先度を設定できる項目をiniに追加(ThreadPriority)
+   ・Spinelプロセスの優先度を設定できる項目をiniに追加(ProcessPriority)
 
   ver. 1.1
 
-   �ESpinelRs ���� SpinelRD �ɖ��̕ύX(BDS����VC++�ɊJ�������ڍs)
-   �ESpinelDeathResume�̋@�\�����P(Spinel�����炩�̗��R�Ńt���[�Y�����ꍇ�A����
-    Spinel�v���Z�X����x���S�ɎE���Ă���Spinel���ēx�����グ�����d�g�݂ɉ���)
-   �E�^�X�N�g���C�ɃA�C�R�����풓������@�\��ini�ɒǉ�(ShowTaskIcon)
+   ・SpinelRs から SpinelRD に名称変更(BDSからVC++に開発環境を移行)
+   ・SpinelDeathResumeの機能を改善(Spinelが何らかの理由でフリーズした場合、その
+    Spinelプロセスを一度完全に殺してからSpinelを再度立ち上げ直す仕組みに改良)
+   ・タスクトレイにアイコンを常駐させる機能をiniに追加(ShowTaskIcon)
 
 
-���Ɛӎ���
+■免責事項
 
-  ���ۏ� ( NO WARRANTY )
+  無保証 ( NO WARRANTY )
 
 
-�ȏ�m�V
+以上ノシ
