@@ -85,6 +85,7 @@ private:
     if(eq_idx==string::npos) return ;
     Transit[trim(line.substr(0,eq_idx))]=trim(line.substr(eq_idx+1)) ;
   }
+  BOOL Loaded_;
 public:
   explicit CTransitReader(const string &_FileName)
     : CTransitBase(_FileName) {
@@ -107,7 +108,7 @@ public:
     Transit.clear() ;
     FILE *st = NULL ;
     fopen_s(&st,FileName.c_str(),"rt") ;
-    if(!st) return FALSE ;
+    if(!st) return Loaded_=FALSE ;
     string line ;
     while(!feof(st)) {
       int c=getc(st) ;
@@ -119,8 +120,9 @@ public:
     if(line.length()>0)
       Parse(line) ;
     fclose(st) ;
-    return TRUE ;
+    return Loaded_=TRUE ;
   }
+  BOOL Loaded() { return Loaded_ ; }
 };
 
   // CTransitProfiler
@@ -247,7 +249,6 @@ public:
   }
 };
 
-
 //===========================================================================
   // CBonTuner
 //---------------------------------------------------------------------------
@@ -272,7 +273,7 @@ CBonTuner::CBonTuner()
   ReloadOnTunerRetry=1 ;
   FullLoad=0 ;
   FullOpen=0 ;
-  FullScan=1 ;
+  FullScan=0 ;
   LazyOpen=1 ;
   CheckOpening=0 ;
   CheckOpeningCloseOnFailure=1 ;
@@ -389,7 +390,6 @@ void CBonTuner::LoadIni()
     const char *Section = "Setting" ;
     // Transit ファイルに遷移状態を記録するかどうか
     LOADINT(RecordTransit) ;
-    if(!RecordTransit) FullScan=0 ;
     // Transit 出力ディレクトリ
     LOADSTR(RecordTransitDir) ;
     if(!RecordTransitDir.empty()) {
@@ -495,8 +495,10 @@ void CBonTuner::LoadIni()
     LOADINT(CurRSpace) ;
   }
 
+  BOOL transitLoaded = FALSE;
   if(RecordTransit) {
     CTransitReader reader(transitFileName) ;
+    transitLoaded = reader.Loaded();
     for(size_t i=0;i<TunerPaths.size();i++) {
       string tuner_key = "Tuner"+itos(static_cast<int>(i)) ;
       int MaxSpace = reader.ReadInteger(tuner_key+".MaxSpace",-1) ;
@@ -523,6 +525,14 @@ void CBonTuner::LoadIni()
       Tuner.MaxSpace = MaxSpace ;
       Tuner.Profiled = TRUE ;
       Tuners.push_back(Tuner) ;
+    }
+  }
+
+  if(!transitLoaded&&FullScan) {
+    LazyOpen = 0 ;
+    if(OpenTuner()) {
+      DoFullScan() ;
+      CloseTuner() ;
     }
   }
 

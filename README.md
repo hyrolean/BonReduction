@@ -141,8 +141,10 @@ BonDriver_RDCT ( BonDriver_Reduction )
 
 ## ■更新履歴
 
-- version 1.5 rev.7
+- version 1.5 rev.8
 
+  - 初期化時にチューナーを開いてチャンネル情報を事前にスキャンして列挙補完して
+    おくかどうかを決定する項目 FullScan をiniに追加[rev.8]
   - 割込みタイマーの精度を高める項目 HRTimerEnabled をiniに追加[rev.7]
   - IBonDriver2 インスタンス変換時に dynamic_cast を使用する仕様に変更[rev.6]
   - ミューテックスの分類項目 TunerMutexAvoidPrefix をiniに追加[rev.5++(rev.2)]

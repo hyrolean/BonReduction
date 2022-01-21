@@ -798,7 +798,7 @@ CAsyncFifo::CAsyncFifo(
     BufferPool.resize(MaximumPool);
 #ifdef ASYNCFIFO_HEAPBUFFERPOOL
     // ÉqÅ[ÉvçÏê¨
-    Heap = HeapCreate(flag, 0, 0);
+    Heap = HeapCreate(flag, PacketSize*TotalPool, PacketSize*MaximumPool);
     BufferPool.set_heap(Heap) ;
     BufferPool.set_heap_flag(flag) ;
 #endif

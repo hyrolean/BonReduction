@@ -690,15 +690,7 @@ bool CMainDaemon::LaunchSpinel()
       FILETIME local ;
       fname = relPath + string(find_data.cFileName) ;
       FileTimeToLocalFileTime(&find_data.ftLastWriteTime, &local);
-
-      #if 1
-      ftime = COleDateTimeSpan(COleDateTime(local)).GetTotalDays() ;
-      #else
-      WORD d=0, t=0 ;
-      FileTimeToDosDateTime(&local, &d, &t);
-      ftime = double(d) + double(t)/65536.0 ;
-      #endif
-
+      ftime = static_cast<double>(COleDateTimeSpan(COleDateTime(local)));
       fsize = __int64(find_data.nFileSizeHigh)<<32 | __int64(find_data.nFileSizeLow) ;
     }
   };
