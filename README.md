@@ -143,6 +143,8 @@ BonDriver_RDCT ( BonDriver_Reduction )
 
 - version 1.5 rev.8
 
+  - Transitファイルの TunerX.SpaceX.ChannelX に Visible フラグを追加[rev.8]
+    ( TunerX.SpaceX.ChannelX.Visible=0 にすると所定のチャンネルを非表示 )
   - 初期化時にチューナーを開いてチャンネル情報を事前にスキャンして列挙補完して
     おくかどうかを決定する項目 FullScan をiniに追加[rev.8]
   - 割込みタイマーの精度を高める項目 HRTimerEnabled をiniに追加[rev.7]
