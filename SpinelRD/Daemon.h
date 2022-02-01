@@ -50,11 +50,14 @@ typedef std::map<int,CDaemonTimer*> MAP_DaemonTimer ;
     int MaxDays;
     __int64 MaxBytes;
     bool SubDirectories;
-    masks_t FellowSuffixes ;
+    masks_t FellowSuffixes;
+    int StartTime, EndTime;
     TRotationItem(std::string FileMasks_,int MaxFiles_,int MaxDays_,
-      __int64 MaxBytes_,bool SubDirectories_=false,std::string FellowSuffix_="^")
+      __int64 MaxBytes_,bool SubDirectories_=false,std::string FellowSuffix_="^",
+      int StartTime_=0, int EndTime_=0)
       : MaxFiles(MaxFiles_),MaxDays(MaxDays_),
-        MaxBytes(MaxBytes_),SubDirectories(SubDirectories_) {
+        MaxBytes(MaxBytes_),SubDirectories(SubDirectories_),
+        StartTime(StartTime_),EndTime(EndTime_) {
       FilePath = file_path_of(FileMasks_) ;
       std::string MaskCSV = file_name_of(FileMasks_) ;
       if(MaskCSV!="^") {
@@ -63,6 +66,8 @@ typedef std::map<int,CDaemonTimer*> MAP_DaemonTimer ;
       if(FellowSuffix_!="^") {
         split(FellowSuffixes,FellowSuffix_,',');
       }
+      StartTime = min( max(0, StartTime), 24*60);
+      EndTime = min( max(0, EndTime), 24*60);
     }
   };
   typedef std::vector<TRotationItem> TRotations;
@@ -80,6 +85,7 @@ private:
   CDaemonTimer *ResumeTimer;
   CDaemonTimer *JobTimer;
   std::string AppExeName();
+  std::string IniFileName();
   exclusive_object exclLog;
 protected:
   bool Suspended, Resumed, EndSession, Finalized, JobAborted ;
@@ -123,6 +129,11 @@ public:
   void Initialize(HINSTANCE InstanceHandle, HWND MainWindowHandle);
   void Finalize();
   void LogOut(const char* format, ...) ;
+public:
+  BOOL DAEMONJobPaused() { return DAEMONJobPause; }
+  void DAEMONPauseJob(BOOL val);
+  BOOL SpinelDeathResumeEnabled() { return SpinelDeathResume; }
+  void SpinelEnableDeathResume(BOOL val);
 };
 
 extern CMainDaemon MainDaemon;

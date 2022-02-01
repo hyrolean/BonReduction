@@ -2,7 +2,7 @@
 
 #include "resource.h"
 
-#define SPINELRD_VER "Spinel Resume DAEMON v1.1i"
+#define SPINELRD_VER "Spinel Resume DAEMON v1.2"
 
 #define WM_USERTASKBAR  (WM_APP+128)
 

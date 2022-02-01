@@ -218,6 +218,10 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		SendMessage(hDlg,WM_SETICON,ICON_SMALL,
 			(LPARAM)LoadImage(hInst, MAKEINTRESOURCE(IDI_SMALL), IMAGE_ICON, 16, 16, 0));
 		SetWindowText(GetDlgItem(hDlg,IDC_STATIC_VER),_T(SPINELRD_VER));
+		SendMessage(GetDlgItem(hDlg,IDC_CHECK_JOBPAUSE), BM_SETCHECK,
+			MainDaemon.DAEMONJobPaused()?BST_CHECKED:BST_UNCHECKED, 0);
+		SendMessage(GetDlgItem(hDlg,IDC_CHECK_DEATHRESUME), BM_SETCHECK,
+			MainDaemon.SpinelDeathResumeEnabled()?BST_CHECKED:BST_UNCHECKED, 0);
 		return (INT_PTR)TRUE;
 
 	case WM_COMMAND:
@@ -225,6 +229,18 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			EndDialog(hDlg, LOWORD(wParam));
 			return (INT_PTR)TRUE;
+		}
+		switch(LOWORD(wParam)) {
+			case IDC_CHECK_JOBPAUSE:
+				MainDaemon.DAEMONPauseJob(
+					BST_CHECKED==SendMessage(HWND(lParam), BM_GETCHECK, 0, 0)?
+					TRUE:FALSE );
+				break;
+			case IDC_CHECK_DEATHRESUME:
+				MainDaemon.SpinelEnableDeathResume(
+					BST_CHECKED==SendMessage(HWND(lParam), BM_GETCHECK, 0, 0)?
+					TRUE:FALSE );
+				break;
 		}
 		break;
 	}

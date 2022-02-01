@@ -216,9 +216,15 @@ string CMainDaemon::AppExeName()
   return szPath ;
 }
 //---------------------------------------------------------------------------
+string CMainDaemon::IniFileName()
+{
+  string appExeName = AppExeName() ;
+  return file_path_of(appExeName) + file_prefix_of(appExeName) + ".ini" ;
+}
+//---------------------------------------------------------------------------
 void CMainDaemon::LoadIni()
 {
-  string iniFileName = file_path_of(AppExeName()) + file_prefix_of(AppExeName()) + ".ini" ;
+  string iniFileName = IniFileName() ;
   if(!file_is_existed(iniFileName)) {
     DBGOUT("Ini file \"%s\" was not existed.\n",iniFileName.c_str());
     return ;
@@ -412,7 +418,7 @@ void CMainDaemon::LoadIni()
           int MaxFiles=INT_MAX, MaxDays=INT_MAX ;
           __int64 MaxBytes=DEFMAXBYTES ;
           BOOL SubDirectories=0 ;
-          string FellowSuffix="^";
+          string FellowSuffix="^", ActiveTime="";
           LOADINT(Enabled);
           LogOut("\tローテーション機能:\t%s", Enabled?"有効":"無効(※スキップします。)");
           if(!Enabled) continue ;
@@ -420,9 +426,20 @@ void CMainDaemon::LoadIni()
           LOADINT(MaxDays);
           LOADINT64(MaxBytes);
           LOADINT(SubDirectories);
-          LOADSTR(FellowSuffix) ;
+          LOADSTR(FellowSuffix);
+          LOADSTR(ActiveTime);
+          int StartTime=0, EndTime=0;
+          if(!ActiveTime.empty()) {
+            string TimeStr="";
+            for(string::iterator pos=ActiveTime.begin();pos!=ActiveTime.end();++pos)
+              if(*pos==';') break;
+              else if(*pos>0x20) TimeStr+=*pos ;
+            int SHH,SMM,EHH,EMM;
+            if(sscanf(TimeStr.c_str(),"%d:%d-%d:%d",&SHH,&SMM,&EHH,&EMM)==4)
+              StartTime = SHH*60+SMM, EndTime= EHH*60+EMM;
+          }
           rotations.push_back(
-            TRotationItem(FileMask,MaxFiles,MaxDays,MaxBytes,!!SubDirectories,FellowSuffix));
+            TRotationItem(FileMask,MaxFiles,MaxDays,MaxBytes,!!SubDirectories,FellowSuffix,StartTime,EndTime));
         }
         // 登録内容の検証
         TRotationItem &item = rotations.back();
@@ -475,6 +492,11 @@ void CMainDaemon::LoadIni()
                 (IntToKMGT(free_space)+"Bytes").c_str() );
             }
           }
+        }
+        if(item.StartTime!=item.EndTime) {
+          LogOut("\t活動時間:\t%02d時%02d分 から %s%02d時%02d分 の間",
+            item.StartTime/60, item.StartTime%60, item.StartTime>item.EndTime ? "翌 ":"",
+            item.EndTime/60, item.EndTime%60 );
         }
       }
     }
@@ -635,7 +657,7 @@ bool CMainDaemon::LaunchSpinel()
 
       SHELLEXECUTEINFOA info ;
       ZeroMemory(&info,sizeof(info));
-      info.cbSize = sizeof(SHELLEXECUTEINFO) ;
+      info.cbSize = sizeof(SHELLEXECUTEINFOA) ;
       info.fMask |= SEE_MASK_NOCLOSEPROCESS ;
       info.hwnd = HWMain ;
       info.lpVerb = NULL ;
@@ -850,11 +872,26 @@ static void LogRotateFiles(CMainDaemon *daemon,
 
 
 //---------------------------------------------------------------------------
+
+  static bool IsActiveTime(const TRotationItem &Item, const COleDateTime &Time) {
+    int ct = Time.GetHour()*60 + Time.GetMinute();
+    int st = Item.StartTime ;
+    int et = Item.EndTime ;
+    if(et<=st) {
+      if(st<=ct) et=24*60;
+      if(ct<=et) st=0;
+    }
+    return st <= ct && ct <= et ;
+  }
+
 void CMainDaemon::JobRotate()
 {
+  COleDateTime CurrentTime = COleDateTime::GetCurrentTime();
+
   size_t i;
   for(i=0;i<JobRotations.size();i++) { // Active Rotation (MaxBytes limited)
     if(JobRotations[i].MaxBytes<0) break ; // passive found
+    if(!IsActiveTime(JobRotations[i],CurrentTime)) continue;
     LogRotateFiles(this,
       JobRotations[i].FilePath,
       JobRotations[i].Masks,
@@ -884,6 +921,7 @@ void CMainDaemon::JobRotate()
     // ディスク空き容量計測
     for(;i<JobRotations.size();i++) {
       if(JobAborted) return ;
+      if(!IsActiveTime(JobRotations[i],CurrentTime)) continue;
       string drv = upper_case(unc_root_of(JobRotations[i].FilePath)) ;
       if(spaces.find(drv)==spaces.end()) {
         __int64 space = GetDiskFreeSpaceFromFileName(drv) ;
@@ -1103,8 +1141,8 @@ void CMainDaemon::OnStartTimer()
   }
   if(!DAEMONJobPause) {
     OnJobTimer() ;
-    JobTimer->SetEnabled(true) ;
   }
+  JobTimer->SetEnabled(true) ;
   ResumeTimer->SetEnabled(true) ;
 }
 //---------------------------------------------------------------------------
@@ -1173,5 +1211,17 @@ unsigned int __stdcall CMainDaemon::JobThreadProc(PVOID pv)
   this_->JobAll() ;
   _endthreadex(result) ;
   return result;
+}
+//---------------------------------------------------------------------------
+void CMainDaemon::DAEMONPauseJob(BOOL val)
+{
+  WritePrivateProfileStringA("DAEMON", "JobPause", val?"y":"n",
+    IniFileName().c_str());
+}
+//---------------------------------------------------------------------------
+void CMainDaemon::SpinelEnableDeathResume(BOOL val)
+{
+  WritePrivateProfileStringA("Spinel", "DeathResume", val?"y":"n",
+    IniFileName().c_str());
 }
 //===========================================================================

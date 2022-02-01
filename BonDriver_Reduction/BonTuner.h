@@ -13,21 +13,24 @@
 //---------------------------------------------------------------------------
 
 struct VCHANNEL {
+  BOOL Visible ;
   BOOL HasSignal ;
   BOOL HasStream ;
   std::wstring Name ;
-  VCHANNEL(const std::wstring &Name_,BOOL HasSignal_=true,BOOL HasStream_=true)
-    : Name(Name_), HasSignal(HasSignal_), HasStream(HasStream_) {}
+  VCHANNEL(const std::wstring &Name_,BOOL Visible_=TRUE,BOOL HasSignal_=TRUE,BOOL HasStream_=TRUE)
+    : Name(Name_), Visible(Visible_), HasSignal(HasSignal_), HasStream(HasStream_) {}
   VCHANNEL(const VCHANNEL &Src)
-    : Name(Src.Name), HasSignal(Src.HasSignal), HasStream(Src.HasStream) {}
+    : Name(Src.Name), Visible(Src.Visible), HasSignal(Src.HasSignal), HasStream(Src.HasStream) {}
   operator std::wstring() const {
     return Name ;
   }
 };
 
+typedef std::vector<VCHANNEL> VCHANNELS ;
+
 struct VSPACE {
   std::wstring Name ;
-  std::vector<VCHANNEL> Channels ;
+  VCHANNELS Channels ;
   int MaxChannel ;
   BOOL Profiled ;
   BOOL Visible ;
@@ -39,11 +42,13 @@ struct VSPACE {
   }
 };
 
+typedef std::vector<VSPACE> VSPACES ;
+
 struct VTUNER {
   HINSTANCE Module ;
   IBonDriver2 *Tuner ;
   HANDLE Mutex ;
-  std::vector<VSPACE> Spaces ;
+  VSPACES Spaces ;
   int MaxSpace ;
   BOOL Opening ;
   BOOL Profiled ;
@@ -78,10 +83,14 @@ struct VTUNER {
   }
 };
 
+typedef std::vector<VTUNER> VTUNERS ;
+
 struct VSPACE_ANCHOR {
   int Tuner, Space ;
   explicit VSPACE_ANCHOR(int tuner, int spc) : Tuner(tuner), Space(spc) {}
 };
+
+typedef std::vector<VSPACE_ANCHOR> VSPACE_ANCHORS;
 
 class CBonTuner : public IBonDriver2
 {
@@ -91,13 +100,13 @@ private:
 protected:
   int RefCount ;
   DWORD CurSpace, CurChannel ;
-  DWORD CurRTuner, CurRSpace ;
+  DWORD CurRTuner, CurRSpace, CurRChannel ;
   BOOL CurHasSignal, CurHasStream ;
   std::wstring TunerName ;
   std::vector< std::deque<std::string> > TunerPaths ;
   std::vector< std::deque<HINSTANCE> > TunerModules ;
-  std::vector<VTUNER> Tuners ;
-  std::vector<VSPACE_ANCHOR> SpaceAnchors ;
+  VTUNERS Tuners ;
+  VSPACE_ANCHORS SpaceAnchors ;
   std::string RecordTransitDir ;
   DWORD TunerRetryDuration ;
   BOOL FullLoad ;
@@ -162,6 +171,7 @@ protected:
   std::string MakeModulePath() ;
   std::string MakeModulePrefix() ;
   BOOL VirtualToRealSpace(const DWORD dwSpace,DWORD &tuner,DWORD &spc) ;
+  BOOL VirtualToRealChannel(const DWORD dwSpace,const DWORD dwChannel,DWORD &tuner,DWORD &spc,DWORD &ch) ;
   BOOL SerialToVirtualChannel(const DWORD SCh,DWORD &VSpace,DWORD &VCh) ;
   BOOL VirtualToSerialChannel(const DWORD VSpace,const DWORD VCh,DWORD &SCh) ;
   LPCTSTR EnumVirtualChannelName(const DWORD dwSpace, const DWORD dwChannel) ;
