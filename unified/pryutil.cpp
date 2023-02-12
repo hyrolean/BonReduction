@@ -4,9 +4,12 @@
 #include <cstdarg>
 #include <process.h>
 #include <locale.h>
+#include <Rpc.h>
+#pragma comment(lib, "Rpcrt4.lib")
+#ifdef PRY8EAlByw_SHLWAPI
 #include <Shlwapi.h>
 #pragma comment(lib, "Shlwapi.lib")
-#pragma comment(lib, "Rpcrt4.lib")
+#endif
 
 #include "pryutil.h"
 //---------------------------------------------------------------------------
@@ -15,6 +18,14 @@ using namespace std ;
 //===========================================================================
 namespace PRY8EAlByw {
 //---------------------------------------------------------------------------
+
+#ifdef PRY8EAlByw_HRTIMER
+  #define wait_object HRWaitForSingleObject
+  #define delay HRSleep
+#else
+  #define wait_object WaitForSingleObject
+  #define delay Sleep
+#endif
 
 //===========================================================================
 // Statics
@@ -73,7 +84,7 @@ DWORD PastSleep(DWORD wait,DWORD start)
 {
   if(!wait) return start ;
   DWORD past = Elapsed(start,GetTickCount()) ;
-  if(wait>past) Sleep(wait-past) ;
+  if(wait>past) delay(wait-past);
   return start+wait ;
 }
 //---------------------------------------------------------------------------
@@ -208,7 +219,7 @@ int file_age_of(string filename)
 //---------------------------------------------------------------------------
 bool file_is_existed(string filename)
 {
-#if 0
+#ifndef PRY8EAlByw_SHLWAPI
   return file_age_of(filename.c_str()) != -1 ;
 #else
   return PathFileExistsA(filename.c_str()) && !folder_is_existed(filename) ;
@@ -217,7 +228,7 @@ bool file_is_existed(string filename)
 //---------------------------------------------------------------------------
 bool folder_is_existed(string filename)
 {
-#if 0
+#ifndef PRY8EAlByw_SHLWAPI
   DWORD attr = GetFileAttributesA(filename.c_str()) ;
   return attr!=MAXDWORD && (attr&FILE_ATTRIBUTE_DIRECTORY) ? true : false ;
 #else
@@ -711,7 +722,7 @@ HANDLE event_object::open() const
 //---------------------------------------------------------------------------
 DWORD event_object::wait(DWORD timeout)
 {
-  return is_valid() ? WaitForSingleObject(event,timeout) : WAIT_FAILED ;
+  return is_valid() ? wait_object(event,timeout) : WAIT_FAILED ;
 }
 //---------------------------------------------------------------------------
 BOOL event_object::set()
@@ -826,7 +837,7 @@ CAsyncFifo::~CAsyncFifo()
     bool abnormal=false ;
     if(AllocThread!=INVALID_HANDLE_VALUE) {
       AllocOrderEvent.set() ;
-      if(::WaitForSingleObject(AllocThread,30000) != WAIT_OBJECT_0) {
+      if(wait_object(AllocThread,30000) != WAIT_OBJECT_0) {
         ::TerminateThread(AllocThread, 0);
         abnormal=true ;
       }
@@ -1159,7 +1170,7 @@ bool CSharedMemory::IsValid() const
 bool CSharedMemory::Lock(DWORD timeout) const
 {
     if(!HMutex) return false ;
-    return WaitForSingleObject(HMutex, timeout) == WAIT_OBJECT_0 ;
+    return wait_object(HMutex, timeout) == WAIT_OBJECT_0 ;
 }
 //---------------------------------------------------------------------------
 bool CSharedMemory::Unlock() const
